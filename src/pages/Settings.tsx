@@ -17,8 +17,10 @@ const Settings = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [voiceSettings, setVoiceSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [creatingAssistant, setCreatingAssistant] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -36,6 +38,30 @@ const Settings = () => {
 
       if (error) throw error;
       setRestaurant(data);
+
+      // Fetch voice settings
+      const { data: voiceData, error: voiceError } = await supabase
+        .from('restaurant_voice_settings')
+        .select('*')
+        .eq('restaurant_id', data.id)
+        .maybeSingle();
+
+      if (voiceError && voiceError.code !== 'PGRST116') {
+        console.error('Error fetching voice settings:', voiceError);
+      }
+
+      setVoiceSettings(voiceData || {
+        supported_languages: ['en', 'hi', 'pa', 'gu'],
+        greeting_en: '',
+        greeting_hi: '',
+        greeting_pa: '',
+        greeting_gu: '',
+        closing_en: '',
+        closing_hi: '',
+        closing_pa: '',
+        closing_gu: '',
+        notes_for_agent: ''
+      });
     } catch (error: any) {
       toast({
         title: 'Error loading settings',
@@ -76,6 +102,74 @@ const Settings = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveVoiceSettings = async () => {
+    if (!restaurant || !voiceSettings) return;
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('restaurant_voice_settings')
+        .upsert({
+          restaurant_id: restaurant.id,
+          ...voiceSettings,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Voice settings saved',
+        description: 'Your voice agent configuration has been updated.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error saving voice settings',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreateVapiAssistant = async () => {
+    if (!restaurant) return;
+
+    setCreatingAssistant(true);
+    try {
+      // First save voice settings
+      await handleSaveVoiceSettings();
+
+      // Then create VAPI assistant
+      const { data, error } = await supabase.functions.invoke('vapi-assistant', {
+        body: { restaurantId: restaurant.id }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        // Update local restaurant state with new assistant ID
+        setRestaurant(prev => prev ? { ...prev, vapi_assistant_id: data.assistantId } : null);
+        
+        toast({
+          title: 'VAPI Assistant Created!',
+          description: `Assistant ID: ${data.assistantId}`,
+        });
+      } else {
+        throw new Error(data.error || 'Failed to create assistant');
+      }
+    } catch (error: any) {
+      console.error('Error creating VAPI assistant:', error);
+      toast({
+        title: 'Error creating assistant',
+        description: error.message || 'Please check your VAPI API key and try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreatingAssistant(false);
     }
   };
 
@@ -188,20 +282,198 @@ const Settings = () => {
             </TabsContent>
 
             <TabsContent value="voice">
-              <Card className="border-border/50">
-                <CardHeader>
-                  <CardTitle>Voice Agent Settings</CardTitle>
-                  <CardDescription>
-                    Configure your AI voice assistant (Coming Soon)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Voice agent configuration will be available in the next update.
-                    This will include multilingual greetings, custom prompts, and VAPI integration.
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="space-y-6">
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle>VAPI Assistant Status</CardTitle>
+                    <CardDescription>
+                      {restaurant?.vapi_assistant_id 
+                        ? 'Your voice assistant is active' 
+                        : 'Create a voice assistant to start taking orders'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {restaurant?.vapi_assistant_id && (
+                      <div className="rounded-lg bg-primary/10 p-4">
+                        <p className="text-sm font-medium text-foreground">Assistant ID</p>
+                        <p className="text-xs text-muted-foreground font-mono mt-1">
+                          {restaurant.vapi_assistant_id}
+                        </p>
+                      </div>
+                    )}
+                    <Button 
+                      onClick={handleCreateVapiAssistant} 
+                      disabled={creatingAssistant}
+                      className="w-full"
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {creatingAssistant 
+                        ? 'Creating Assistant...' 
+                        : restaurant?.vapi_assistant_id 
+                          ? 'Update VAPI Assistant' 
+                          : 'Create VAPI Assistant'}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      This will save your voice settings and create/update your VAPI assistant with the latest menu and restaurant information.
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle>Multilingual Greetings</CardTitle>
+                    <CardDescription>
+                      Customize greetings for each supported language
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="greeting_en">English Greeting</Label>
+                      <Textarea
+                        id="greeting_en"
+                        value={voiceSettings?.greeting_en || ''}
+                        onChange={(e) =>
+                          setVoiceSettings((prev: any) => ({ ...prev, greeting_en: e.target.value }))
+                        }
+                        placeholder="Welcome to [Restaurant Name]! How can I help you today?"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="greeting_hi">Hindi Greeting (हिंदी)</Label>
+                      <Textarea
+                        id="greeting_hi"
+                        value={voiceSettings?.greeting_hi || ''}
+                        onChange={(e) =>
+                          setVoiceSettings((prev: any) => ({ ...prev, greeting_hi: e.target.value }))
+                        }
+                        placeholder="[Restaurant Name] में आपका स्वागत है! मैं आपकी कैसे मदद कर सकता हूं?"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="greeting_pa">Punjabi Greeting (ਪੰਜਾਬੀ)</Label>
+                      <Textarea
+                        id="greeting_pa"
+                        value={voiceSettings?.greeting_pa || ''}
+                        onChange={(e) =>
+                          setVoiceSettings((prev: any) => ({ ...prev, greeting_pa: e.target.value }))
+                        }
+                        placeholder="[Restaurant Name] ਵਿੱਚ ਤੁਹਾਡਾ ਸਵਾਗਤ ਹੈ! ਮੈਂ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="greeting_gu">Gujarati Greeting (ગુજરાતી)</Label>
+                      <Textarea
+                        id="greeting_gu"
+                        value={voiceSettings?.greeting_gu || ''}
+                        onChange={(e) =>
+                          setVoiceSettings((prev: any) => ({ ...prev, greeting_gu: e.target.value }))
+                        }
+                        placeholder="[Restaurant Name] માં તમારું સ્વાગત છે! હું તમારી કેવી રીતે મદદ કરી શકું?"
+                        rows={2}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle>Closing Messages</CardTitle>
+                    <CardDescription>
+                      Customize closing messages for each language
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="closing_en">English Closing</Label>
+                      <Textarea
+                        id="closing_en"
+                        value={voiceSettings?.closing_en || ''}
+                        onChange={(e) =>
+                          setVoiceSettings((prev: any) => ({ ...prev, closing_en: e.target.value }))
+                        }
+                        placeholder="Thank you for calling [Restaurant Name]. Have a great day!"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="closing_hi">Hindi Closing (हिंदी)</Label>
+                      <Textarea
+                        id="closing_hi"
+                        value={voiceSettings?.closing_hi || ''}
+                        onChange={(e) =>
+                          setVoiceSettings((prev: any) => ({ ...prev, closing_hi: e.target.value }))
+                        }
+                        placeholder="[Restaurant Name] को कॉल करने के लिए धन्यवाद। आपका दिन शुभ हो!"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="closing_pa">Punjabi Closing (ਪੰਜਾਬੀ)</Label>
+                      <Textarea
+                        id="closing_pa"
+                        value={voiceSettings?.closing_pa || ''}
+                        onChange={(e) =>
+                          setVoiceSettings((prev: any) => ({ ...prev, closing_pa: e.target.value }))
+                        }
+                        placeholder="[Restaurant Name] ਨੂੰ ਕਾਲ ਕਰਨ ਲਈ ਧੰਨਵਾਦ। ਤੁਹਾਡਾ ਦਿਨ ਸ਼ੁਭ ਹੋਵੇ!"
+                        rows={2}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="closing_gu">Gujarati Closing (ગુજરાતી)</Label>
+                      <Textarea
+                        id="closing_gu"
+                        value={voiceSettings?.closing_gu || ''}
+                        onChange={(e) =>
+                          setVoiceSettings((prev: any) => ({ ...prev, closing_gu: e.target.value }))
+                        }
+                        placeholder="[Restaurant Name] ને કૉલ કરવા બદલ આભાર। તમારો દિવસ શુભ રહે!"
+                        rows={2}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle>Agent Instructions</CardTitle>
+                    <CardDescription>
+                      Special instructions and guidelines for your AI assistant
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="notes_for_agent">Additional Instructions</Label>
+                      <Textarea
+                        id="notes_for_agent"
+                        value={voiceSettings?.notes_for_agent || ''}
+                        onChange={(e) =>
+                          setVoiceSettings((prev: any) => ({ ...prev, notes_for_agent: e.target.value }))
+                        }
+                        placeholder="Examples: Always mention today's special, ask about spice level, mention delivery time is 30-45 minutes..."
+                        rows={4}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        These instructions will guide the AI on how to handle specific situations or promote special offers.
+                      </p>
+                    </div>
+
+                    <Button onClick={handleSaveVoiceSettings} disabled={saving}>
+                      <Save className="mr-2 h-4 w-4" />
+                      {saving ? 'Saving...' : 'Save Voice Settings'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="integration">
