@@ -54,7 +54,7 @@ export function formatMenuForPrompt(
         if (item.description) {
           menuText += ` - ${item.description}`;
         }
-        menuText += ` - ₹${item.price}`;
+        menuText += ` - $${item.price}`;
         if (item.is_vegetarian) {
           menuText += ' (Veg)';
         }
@@ -71,7 +71,7 @@ export function formatMenuForPrompt(
   if (uncategorized && uncategorized.length > 0) {
     menuText += `\n## Other Items\n`;
     uncategorized.forEach(item => {
-      menuText += `- ${item.name} - ₹${item.price}`;
+      menuText += `- ${item.name} - $${item.price}`;
       if (item.is_vegetarian) menuText += ' (Veg)';
       menuText += '\n';
     });

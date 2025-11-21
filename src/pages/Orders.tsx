@@ -189,7 +189,7 @@ const Orders = () => {
                         {order.status.replace('_', ' ').toUpperCase()}
                       </Badge>
                       <div className="text-2xl font-bold text-foreground">
-                        ₹{order.total_amount.toLocaleString('en-IN')}
+                        ${order.total_amount.toLocaleString('en-US')}
                       </div>
                       <span className="text-sm text-muted-foreground">
                         Language: {order.language_used.toUpperCase()}
