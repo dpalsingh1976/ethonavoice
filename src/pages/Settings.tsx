@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Phone, ArrowLeft, Save } from 'lucide-react';
-import { Restaurant } from '@/types/database';
+import { Restaurant, MenuItem } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 
 const Settings = () => {
@@ -21,6 +21,8 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creatingAssistant, setCreatingAssistant] = useState(false);
+  const [generatingPrompt, setGeneratingPrompt] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -62,6 +64,11 @@ const Settings = () => {
         closing_gu: '',
         notes_for_agent: ''
       });
+      
+      // Set system prompt if exists
+      if (voiceData?.system_prompt) {
+        setSystemPrompt(voiceData.system_prompt);
+      }
     } catch (error: any) {
       toast({
         title: 'Error loading settings',
@@ -115,6 +122,7 @@ const Settings = () => {
         .upsert({
           restaurant_id: restaurant.id,
           ...voiceSettings,
+          system_prompt: systemPrompt || null,
           updated_at: new Date().toISOString()
         });
 
@@ -135,17 +143,69 @@ const Settings = () => {
     }
   };
 
+  const handleGeneratePrompt = async () => {
+    if (!restaurant) return;
+
+    setGeneratingPrompt(true);
+    try {
+      // Fetch all data needed for prompt generation
+      const [hoursResult, categoriesResult, itemsResult] = await Promise.all([
+        supabase.from('restaurant_hours').select('*').eq('restaurant_id', restaurant.id),
+        supabase.from('menu_categories').select('*').eq('restaurant_id', restaurant.id).order('sort_order'),
+        supabase.from('menu_items').select('*').eq('restaurant_id', restaurant.id)
+      ]);
+
+      // Import the utility function
+      const { generateSystemPrompt } = await import('@/lib/vapi-utils');
+      
+      const prompt = generateSystemPrompt(
+        restaurant,
+        voiceSettings || {},
+        hoursResult.data || [],
+        categoriesResult.data || [],
+        (itemsResult.data || []) as MenuItem[]
+      );
+
+      setSystemPrompt(prompt);
+      
+      toast({
+        title: 'System prompt generated',
+        description: 'Review and edit the prompt below before creating your assistant.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error generating prompt',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setGeneratingPrompt(false);
+    }
+  };
+
   const handleCreateVapiAssistant = async () => {
     if (!restaurant) return;
+    
+    if (!systemPrompt) {
+      toast({
+        title: 'No system prompt',
+        description: 'Please generate a system prompt first.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setCreatingAssistant(true);
     try {
-      // First save voice settings
+      // First save voice settings with the system prompt
       await handleSaveVoiceSettings();
 
-      // Then create VAPI assistant
+      // Then create VAPI assistant with the custom prompt
       const { data, error } = await supabase.functions.invoke('vapi-assistant', {
-        body: { restaurantId: restaurant.id }
+        body: { 
+          restaurantId: restaurant.id,
+          systemPrompt: systemPrompt 
+        }
       });
 
       if (error) throw error;
@@ -285,6 +345,42 @@ const Settings = () => {
               <div className="space-y-6">
                 <Card className="border-border/50">
                   <CardHeader>
+                    <CardTitle>System Prompt Configuration</CardTitle>
+                    <CardDescription>
+                      Generate and review the AI assistant's instructions before creating
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Button 
+                      onClick={handleGeneratePrompt} 
+                      disabled={generatingPrompt}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      {generatingPrompt ? 'Generating...' : 'Generate System Prompt'}
+                    </Button>
+                    
+                    {systemPrompt && (
+                      <div className="space-y-2">
+                        <Label htmlFor="system_prompt">System Prompt</Label>
+                        <Textarea
+                          id="system_prompt"
+                          value={systemPrompt}
+                          onChange={(e) => setSystemPrompt(e.target.value)}
+                          rows={20}
+                          className="font-mono text-xs"
+                          placeholder="Generate a system prompt to see it here..."
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Review and customize the AI assistant's instructions. This defines how your assistant will behave and respond to customers.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/50">
+                  <CardHeader>
                     <CardTitle>VAPI Assistant Status</CardTitle>
                     <CardDescription>
                       {restaurant?.vapi_assistant_id 
@@ -303,7 +399,7 @@ const Settings = () => {
                     )}
                     <Button 
                       onClick={handleCreateVapiAssistant} 
-                      disabled={creatingAssistant}
+                      disabled={creatingAssistant || !systemPrompt}
                       className="w-full"
                     >
                       <Save className="mr-2 h-4 w-4" />
@@ -314,7 +410,9 @@ const Settings = () => {
                           : 'Create VAPI Assistant'}
                     </Button>
                     <p className="text-xs text-muted-foreground">
-                      This will save your voice settings and create/update your VAPI assistant with the latest menu and restaurant information.
+                      {!systemPrompt 
+                        ? 'Generate a system prompt first before creating your assistant.' 
+                        : 'This will create/update your VAPI assistant with your custom prompt.'}
                     </p>
                   </CardContent>
                 </Card>

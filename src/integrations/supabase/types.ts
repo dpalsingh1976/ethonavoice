@@ -266,6 +266,7 @@ export type Database = {
           notes_for_agent: string | null
           restaurant_id: string
           supported_languages: string[]
+          system_prompt: string | null
           updated_at: string
         }
         Insert: {
@@ -282,6 +283,7 @@ export type Database = {
           notes_for_agent?: string | null
           restaurant_id: string
           supported_languages?: string[]
+          system_prompt?: string | null
           updated_at?: string
         }
         Update: {
@@ -298,6 +300,7 @@ export type Database = {
           notes_for_agent?: string | null
           restaurant_id?: string
           supported_languages?: string[]
+          system_prompt?: string | null
           updated_at?: string
         }
         Relationships: [
