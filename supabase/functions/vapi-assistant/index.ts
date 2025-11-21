@@ -129,7 +129,7 @@ serve(async (req) => {
     }
 
     // Get request body
-    const { restaurantId } = await req.json();
+    const { restaurantId, systemPrompt: customSystemPrompt } = await req.json();
     if (!restaurantId) {
       throw new Error('restaurantId is required');
     }
@@ -159,8 +159,8 @@ serve(async (req) => {
     const categories = categoriesResult.data || [];
     const items = itemsResult.data || [];
 
-    // Generate system prompt
-    const systemPrompt = generateSystemPrompt(restaurant, voiceSettings, hours, categories, items);
+    // Use custom system prompt if provided, otherwise generate it
+    const systemPrompt = customSystemPrompt || generateSystemPrompt(restaurant, voiceSettings, hours, categories, items);
 
     console.log('Creating/updating VAPI assistant for restaurant:', restaurant.name);
 
