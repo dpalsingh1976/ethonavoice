@@ -155,7 +155,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
-                ₹{stats.revenue.toLocaleString('en-IN')}
+                ${stats.revenue.toLocaleString('en-US')}
               </div>
               <p className="text-xs text-muted-foreground">Total revenue</p>
             </CardContent>
