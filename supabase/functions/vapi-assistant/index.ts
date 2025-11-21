@@ -188,7 +188,7 @@ serve(async (req) => {
           }]
         },
         voice: {
-          provider: 'elevenlabs',
+          provider: '11labs',
           voiceId: '21m00Tcm4TlvDq8ikWAM' // Default ElevenLabs voice
         },
         transcriber: {
