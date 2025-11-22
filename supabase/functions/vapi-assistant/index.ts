@@ -185,6 +185,54 @@ serve(async (req) => {
           messages: [{
             role: 'system',
             content: systemPrompt
+          }],
+          functions: [{
+            name: 'create_order',
+            description: 'Create a new order when the customer confirms their order. Call this function with the complete order details.',
+            parameters: {
+              type: 'object',
+              properties: {
+                customerName: {
+                  type: 'string',
+                  description: 'Full name of the customer'
+                },
+                customerPhone: {
+                  type: 'string',
+                  description: 'Phone number of the customer'
+                },
+                customerAddress: {
+                  type: 'string',
+                  description: 'Delivery address (if applicable)'
+                },
+                items: {
+                  type: 'array',
+                  description: 'List of ordered items',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string', description: 'Name of the menu item' },
+                      quantity: { type: 'number', description: 'Quantity ordered' },
+                      price: { type: 'number', description: 'Price per item' },
+                      spiceLevel: { type: 'string', description: 'Spice level (mild, medium, hot)' }
+                    },
+                    required: ['name', 'quantity', 'price']
+                  }
+                },
+                subtotal: {
+                  type: 'number',
+                  description: 'Subtotal before tax'
+                },
+                tax: {
+                  type: 'number',
+                  description: 'Tax amount'
+                },
+                total: {
+                  type: 'number',
+                  description: 'Total amount including tax'
+                }
+              },
+              required: ['customerName', 'customerPhone', 'items', 'subtotal', 'total']
+            }
           }]
         },
         voice: {
@@ -197,6 +245,8 @@ serve(async (req) => {
           language: 'multi' // Multi-language support
         },
         firstMessage: voiceSettings.greeting_en || 'Welcome! How can I help you today?',
+        serverUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/vapi-webhook`,
+        serverMessages: ['end-of-call-report', 'status-update']
       })
     });
 

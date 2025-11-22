@@ -4,9 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Phone, LogOut, Settings, ShoppingBag, Utensils, TrendingUp } from 'lucide-react';
-import { Restaurant } from '@/types/database';
+import { Phone, LogOut, Settings, ShoppingBag, Utensils, TrendingUp, ArrowRight, Clock } from 'lucide-react';
+import { Restaurant, Order } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ const Dashboard = () => {
     totalOrders: 0,
     revenue: 0
   });
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -61,7 +63,8 @@ const Dashboard = () => {
       const { data: orders, error } = await supabase
         .from('orders')
         .select('*')
-        .eq('restaurant_id', restaurantId);
+        .eq('restaurant_id', restaurantId)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
@@ -77,8 +80,26 @@ const Dashboard = () => {
         totalOrders: orders?.length || 0,
         revenue,
       });
+
+      // Set recent orders (top 5)
+      setRecentOrders(orders?.slice(0, 5) || []);
     } catch (error: any) {
       console.error('Error fetching stats:', error);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'new':
+        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+      case 'in_progress':
+        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+      case 'completed':
+        return 'bg-green-500/10 text-green-500 border-green-500/20';
+      case 'cancelled':
+        return 'bg-red-500/10 text-red-500 border-red-500/20';
+      default:
+        return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -161,6 +182,67 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Recent Orders */}
+        {recentOrders.length > 0 && (
+          <Card className="mb-8 border-border/50">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Recent Orders</CardTitle>
+                  <CardDescription>Latest orders from your voice assistant</CardDescription>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => navigate('/orders')}
+                  className="gap-2"
+                >
+                  View All
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between rounded-lg border border-border/50 bg-card p-4 transition-all hover:border-border hover:shadow-md cursor-pointer"
+                    onClick={() => navigate('/orders')}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium text-foreground">{order.customer_name}</p>
+                        <Badge className={getStatusColor(order.status)}>
+                          {order.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {order.customer_phone}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {new Date(order.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-foreground">
+                        ${Number(order.total_amount).toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {order.source === 'voice_agent' ? 'Voice Order' : 'Manual'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quick Actions */}
         <div className="grid gap-6 md:grid-cols-2">
