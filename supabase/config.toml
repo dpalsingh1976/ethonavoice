@@ -2,3 +2,6 @@ project_id = "rsvrhwslkonyrqfvqzzv"
 
 [functions.vapi-assistant]
 verify_jwt = true
+
+[functions.vapi-webhook]
+verify_jwt = false
