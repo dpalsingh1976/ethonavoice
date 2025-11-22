@@ -34,8 +34,8 @@ serve(async (req) => {
       console.log('Order function calls found:', orderCalls.length);
 
       // Get call info and assistant ID from payload
-      const callInfo = payload.message.artifact?.call || payload.call || {};
-      const assistantId = payload.message.artifact?.assistantId || payload.assistantId || callInfo.assistantId;
+      const callInfo = payload.message?.call || payload.message.artifact?.call || payload.call || {};
+      const assistantId = callInfo.assistantId || payload.message.artifact?.assistantId || payload.assistantId;
       
       // Process each order function call
       for (const toolCall of orderCalls) {
