@@ -33,8 +33,9 @@ serve(async (req) => {
 
       console.log('Order function calls found:', orderCalls.length);
 
-      // Get call info from artifact if available
+      // Get call info and assistant ID from payload
       const callInfo = payload.message.artifact?.call || payload.call || {};
+      const assistantId = payload.message.artifact?.assistantId || payload.assistantId || callInfo.assistantId;
       
       // Process each order function call
       for (const toolCall of orderCalls) {
@@ -45,17 +46,35 @@ serve(async (req) => {
             : funcCall.arguments;
 
           console.log('Processing order data:', JSON.stringify(orderData, null, 2));
+          console.log('Assistant ID:', assistantId);
 
-          // Find restaurant by phone number from the call
-          const phoneNumber = callInfo.phoneNumber?.number || callInfo.customer?.number || orderData.customerPhone;
-          const { data: restaurant, error: restaurantError } = await supabase
-            .from('restaurants')
-            .select('id')
-            .eq('phone', phoneNumber)
-            .single();
+          // Find restaurant by VAPI assistant ID (most reliable method)
+          let restaurant = null;
+          let restaurantError = null;
+
+          if (assistantId) {
+            const result = await supabase
+              .from('restaurants')
+              .select('id')
+              .eq('vapi_assistant_id', assistantId)
+              .single();
+            restaurant = result.data;
+            restaurantError = result.error;
+          }
+
+          // Fallback: try to find by the restaurant's phone number from the call
+          if (!restaurant && callInfo.phoneNumber?.number) {
+            const result = await supabase
+              .from('restaurants')
+              .select('id')
+              .eq('phone', callInfo.phoneNumber.number)
+              .single();
+            restaurant = result.data;
+            restaurantError = result.error;
+          }
 
           if (restaurantError || !restaurant) {
-            console.error('Restaurant not found for phone:', phoneNumber, restaurantError);
+            console.error('Restaurant not found. Assistant ID:', assistantId, 'Error:', restaurantError);
             continue;
           }
 
