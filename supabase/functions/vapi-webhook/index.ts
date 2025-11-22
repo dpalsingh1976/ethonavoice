@@ -22,22 +22,23 @@ serve(async (req) => {
     );
 
     // Handle different message types
-    if (payload.message?.type === 'end-of-call-report') {
-      console.log('Processing end-of-call-report');
+    if (payload.message?.type === 'tool-calls') {
+      console.log('Processing tool-calls event');
       
-      // Extract call data
-      const call = payload.message.call;
-      const analysis = payload.message.analysis;
+      // Extract tool calls directly from the payload
+      const toolCalls = payload.message.toolCallList || payload.message.toolCalls || [];
+      const orderCalls = toolCalls.filter((call: any) => 
+        call.function?.name === 'create_order' || call.type === 'function'
+      );
+
+      console.log('Order function calls found:', orderCalls.length);
+
+      // Get call info from artifact if available
+      const callInfo = payload.message.artifact?.call || payload.call || {};
       
-      // Look for function calls in the call that created an order
-      const functionCalls = payload.message.messages?.filter((msg: any) => 
-        msg.role === 'function_call' && msg.name === 'create_order'
-      ) || [];
-
-      console.log('Function calls found:', functionCalls.length);
-
       // Process each order function call
-      for (const funcCall of functionCalls) {
+      for (const toolCall of orderCalls) {
+        const funcCall = toolCall.function || toolCall;
         try {
           const orderData = typeof funcCall.arguments === 'string' 
             ? JSON.parse(funcCall.arguments) 
@@ -46,14 +47,15 @@ serve(async (req) => {
           console.log('Processing order data:', JSON.stringify(orderData, null, 2));
 
           // Find restaurant by phone number from the call
+          const phoneNumber = callInfo.phoneNumber?.number || callInfo.customer?.number || orderData.customerPhone;
           const { data: restaurant, error: restaurantError } = await supabase
             .from('restaurants')
             .select('id')
-            .eq('phone', call.phoneNumber?.number || call.customer?.number)
+            .eq('phone', phoneNumber)
             .single();
 
           if (restaurantError || !restaurant) {
-            console.error('Restaurant not found for phone:', call.phoneNumber?.number, restaurantError);
+            console.error('Restaurant not found for phone:', phoneNumber, restaurantError);
             continue;
           }
 
@@ -72,7 +74,7 @@ serve(async (req) => {
               tax: orderData.tax || 0,
               total_amount: orderData.total,
               currency: 'USD',
-              language_used: call.language || 'en',
+              language_used: callInfo.language || 'en',
               status: 'new'
             })
             .select()
