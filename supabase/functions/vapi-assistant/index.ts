@@ -246,7 +246,7 @@ serve(async (req) => {
         },
         firstMessage: voiceSettings.greeting_en || 'Welcome! How can I help you today?',
         serverUrl: `${Deno.env.get('SUPABASE_URL')}/functions/v1/vapi-webhook`,
-        serverMessages: ['end-of-call-report', 'status-update']
+        serverMessages: ['end-of-call-report', 'status-update', 'function-call']
       })
     });
 
