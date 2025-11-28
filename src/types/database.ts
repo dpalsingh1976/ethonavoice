@@ -12,6 +12,7 @@ export interface Restaurant {
   pos_type: PosType;
   pos_api_key?: string;
   vapi_assistant_id?: string;
+  retell_agent_id?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

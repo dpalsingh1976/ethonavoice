@@ -156,7 +156,7 @@ const Settings = () => {
       ]);
 
       // Import the utility function
-      const { generateSystemPrompt } = await import('@/lib/vapi-utils');
+      const { generateSystemPrompt } = await import('@/lib/voice-agent-utils');
       
       const prompt = generateSystemPrompt(
         restaurant,
@@ -183,7 +183,7 @@ const Settings = () => {
     }
   };
 
-  const handleCreateVapiAssistant = async () => {
+  const handleCreateVoiceAgent = async () => {
     if (!restaurant) return;
     
     if (!systemPrompt) {
@@ -200,8 +200,8 @@ const Settings = () => {
       // First save voice settings with the system prompt
       await handleSaveVoiceSettings();
 
-      // Then create VAPI assistant with the custom prompt
-      const { data, error } = await supabase.functions.invoke('vapi-assistant', {
+      // Then create Retell agent with the custom prompt
+      const { data, error } = await supabase.functions.invoke('retell-agent', {
         body: { 
           restaurantId: restaurant.id,
           systemPrompt: systemPrompt 
@@ -211,21 +211,21 @@ const Settings = () => {
       if (error) throw error;
 
       if (data.success) {
-        // Update local restaurant state with new assistant ID
-        setRestaurant(prev => prev ? { ...prev, vapi_assistant_id: data.assistantId } : null);
+        // Update local restaurant state with new agent ID
+        setRestaurant(prev => prev ? { ...prev, retell_agent_id: data.agentId } : null);
         
         toast({
-          title: 'VAPI Assistant Created!',
-          description: `Assistant ID: ${data.assistantId}`,
+          title: 'Voice Agent Created!',
+          description: `Agent ID: ${data.agentId}`,
         });
       } else {
-        throw new Error(data.error || 'Failed to create assistant');
+        throw new Error(data.error || 'Failed to create agent');
       }
     } catch (error: any) {
-      console.error('Error creating VAPI assistant:', error);
+      console.error('Error creating voice agent:', error);
       toast({
-        title: 'Error creating assistant',
-        description: error.message || 'Please check your VAPI API key and try again.',
+        title: 'Error creating agent',
+        description: error.message || 'Please check your Retell API key and try again.',
         variant: 'destructive',
       });
     } finally {
@@ -381,38 +381,38 @@ const Settings = () => {
 
                 <Card className="border-border/50">
                   <CardHeader>
-                    <CardTitle>VAPI Assistant Status</CardTitle>
+                    <CardTitle>Voice Agent Status</CardTitle>
                     <CardDescription>
-                      {restaurant?.vapi_assistant_id 
+                      {restaurant?.retell_agent_id 
                         ? 'Your voice assistant is active' 
                         : 'Create a voice assistant to start taking orders'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {restaurant?.vapi_assistant_id && (
+                    {restaurant?.retell_agent_id && (
                       <div className="rounded-lg bg-primary/10 p-4">
-                        <p className="text-sm font-medium text-foreground">Assistant ID</p>
+                        <p className="text-sm font-medium text-foreground">Agent ID</p>
                         <p className="text-xs text-muted-foreground font-mono mt-1">
-                          {restaurant.vapi_assistant_id}
+                          {restaurant.retell_agent_id}
                         </p>
                       </div>
                     )}
                     <Button 
-                      onClick={handleCreateVapiAssistant} 
+                      onClick={handleCreateVoiceAgent} 
                       disabled={creatingAssistant || !systemPrompt}
                       className="w-full"
                     >
                       <Save className="mr-2 h-4 w-4" />
                       {creatingAssistant 
-                        ? 'Creating Assistant...' 
-                        : restaurant?.vapi_assistant_id 
-                          ? 'Update VAPI Assistant' 
-                          : 'Create VAPI Assistant'}
+                        ? 'Creating Agent...' 
+                        : restaurant?.retell_agent_id 
+                          ? 'Update Voice Agent' 
+                          : 'Create Voice Agent'}
                     </Button>
                     <p className="text-xs text-muted-foreground">
                       {!systemPrompt 
-                        ? 'Generate a system prompt first before creating your assistant.' 
-                        : 'This will create/update your VAPI assistant with your custom prompt.'}
+                        ? 'Generate a system prompt first before creating your agent.' 
+                        : 'This will create/update your voice agent with your custom prompt.'}
                     </p>
                   </CardContent>
                 </Card>

@@ -5,3 +5,9 @@ verify_jwt = true
 
 [functions.vapi-webhook]
 verify_jwt = false
+
+[functions.retell-agent]
+verify_jwt = true
+
+[functions.retell-webhook]
+verify_jwt = false
