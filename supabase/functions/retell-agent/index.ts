@@ -171,13 +171,13 @@ serve(async (req) => {
     if (existingAgentId) {
       // Update existing agent
       method = 'PATCH';
-      url = `https://api.retellai.com/agent/${existingAgentId}`;
+      url = `https://api.retellai.com/update-agent/${existingAgentId}`;
       agentId = existingAgentId;
       console.log('Updating existing Retell agent:', agentId);
     } else {
       // Create new agent
       method = 'POST';
-      url = 'https://api.retellai.com/agent';
+      url = 'https://api.retellai.com/create-agent';
       console.log('Creating new Retell agent');
     }
     
@@ -188,13 +188,28 @@ serve(async (req) => {
       headers: {
         'Authorization': `Bearer ${retellApiKey}`,
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify(agentConfig),
     });
 
+    console.log('Retell API response status:', retellResponse.status);
+    
     if (!retellResponse.ok) {
       const errorText = await retellResponse.text();
       console.error('Retell API error:', retellResponse.status, errorText);
+      
+      // If 404, the API key might not have permission or endpoint is wrong
+      if (retellResponse.status === 404) {
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Retell API endpoint not found. Please verify your RETELL_API_KEY has the correct permissions for agent creation, or contact Retell support if the issue persists.' 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
