@@ -171,13 +171,13 @@ serve(async (req) => {
     if (existingAgentId) {
       // Update existing agent
       method = 'PATCH';
-      url = `https://api.retellai.com/agent/${existingAgentId}`;
+      url = `https://api.retellai.com/update-agent/${existingAgentId}`;
       agentId = existingAgentId;
       console.log('Updating existing Retell agent:', agentId);
     } else {
       // Create new agent
       method = 'POST';
-      url = 'https://api.retellai.com/agent';
+      url = 'https://api.retellai.com/create-agent';
       console.log('Creating new Retell agent');
     }
     
