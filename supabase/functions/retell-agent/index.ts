@@ -125,7 +125,7 @@ serve(async (req) => {
     };
 
     console.log('Creating/updating Retell LLM...');
-    const llmResponse = await fetch('https://api.retellai.com/create-retell-llm', {
+    const llmResponse = await fetch('https://api.retellai.com/v2/create-retell-llm', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${retellApiKey}`,
@@ -171,13 +171,13 @@ serve(async (req) => {
     if (existingAgentId) {
       // Update existing agent
       method = 'PATCH';
-      url = `https://api.retellai.com/update-agent/${existingAgentId}`;
+      url = `https://api.retellai.com/v2/update-agent/${existingAgentId}`;
       agentId = existingAgentId;
       console.log('Updating existing Retell agent:', agentId);
     } else {
       // Create new agent
       method = 'POST';
-      url = 'https://api.retellai.com/create-agent';
+      url = 'https://api.retellai.com/v2/create-agent';
       console.log('Creating new Retell agent');
     }
     
