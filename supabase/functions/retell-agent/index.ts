@@ -53,29 +53,27 @@ serve(async (req) => {
     // Check if agent already exists
     const existingAgentId = restaurant.retell_agent_id;
 
-    // Prepare agent configuration
+    // Prepare webhook URL
     const webhookUrl = `${supabaseUrl}/functions/v1/retell-webhook`;
     
-    const agentConfig = {
-      agent_name: `${restaurant.name} - Voice Assistant`,
-      voice_id: "21m00Tcm4TlvDq8ikWAM", // ElevenLabs voice ID (same as VAPI)
-      language: "en-US",
-      response_engine: {
-        type: "retell-llm",
-        llm_websocket_url: null, // Use Retell's hosted LLM
-      },
-      llm_websocket_url: null,
+    // Step 1: Create or update Retell LLM with system prompt and tools
+    const llmConfig = {
       general_prompt: systemPrompt,
       begin_message: "Hello! How can I help you today?",
-      enable_backchannel: true,
-      webhook_url: webhookUrl,
-      boosted_keywords: ["order", "delivery", "pickup", "spice", "vegetarian"],
-      ambient_sound: null,
-      // Custom function for order taking
-      function_call_settings: {
-        functions: [{
+      model: "gpt-4o-mini",
+      start_speaker: "agent",
+      general_tools: [
+        {
+          type: "end_call",
+          name: "end_call",
+          description: "End the call when conversation is finished"
+        },
+        {
+          type: "custom",
           name: "create_order",
           description: "Create a new order when customer confirms their complete order",
+          url: webhookUrl,
+          method: "POST",
           speak_after_execution: true,
           speak_during_execution: false,
           parameters: {
@@ -122,8 +120,48 @@ serve(async (req) => {
             },
             required: ["customerName", "customerPhone", "items", "subtotal", "tax", "total"]
           }
-        }]
-      }
+        }
+      ]
+    };
+
+    console.log('Creating/updating Retell LLM...');
+    const llmResponse = await fetch('https://api.retellai.com/create-retell-llm', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${retellApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(llmConfig),
+    });
+
+    if (!llmResponse.ok) {
+      const errorText = await llmResponse.text();
+      console.error('Retell LLM API error:', llmResponse.status, errorText);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Retell LLM API error: ${llmResponse.status} - ${errorText}` 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const llmData = await llmResponse.json();
+    const llmId = llmData.llm_id;
+    console.log('Retell LLM created:', llmId);
+
+    // Step 2: Create or update agent with the LLM
+    const agentConfig = {
+      agent_name: `${restaurant.name} - Voice Assistant`,
+      voice_id: "21m00Tcm4TlvDq8ikWAM",
+      language: "en-US",
+      response_engine: {
+        type: "retell-llm",
+        llm_id: llmId
+      },
+      enable_backchannel: true,
+      webhook_url: webhookUrl,
+      boosted_keywords: ["order", "delivery", "pickup", "spice", "vegetarian"]
     };
 
     let agentId: string;
