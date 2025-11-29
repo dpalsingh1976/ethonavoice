@@ -1,6 +1,7 @@
 // supabase/functions/retell-agent/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Retell from "https://esm.sh/retell-sdk@4.8.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -89,14 +90,20 @@ serve(async (req) => {
     // Webhook URL for Retell to call back into
     const webhookUrl = `${supabaseUrl}/functions/v1/retell-webhook`;
 
+    // Initialize Retell client
+    const retellClient = new Retell({
+      apiKey: retellApiKey,
+    });
+
     // --------------------------
     // Step 1: Create Retell LLM
     // --------------------------
-    const llmConfig = {
+    console.log("Creating/updating Retell LLM...");
+    const llmData = await retellClient.llm.create({
       general_prompt: systemPrompt,
       begin_message: "Hello! How can I help you today?",
       model: "gpt-4o-mini",
-      start_speaker: "agent",
+      starting_state: "agent_speaking",
       general_tools: [
         {
           type: "end_call",
@@ -108,7 +115,6 @@ serve(async (req) => {
           name: "create_order",
           description: "Create a new order when customer confirms their complete order",
           url: webhookUrl,
-          method: "POST",
           speak_after_execution: true,
           speak_during_execution: false,
           parameters: {
@@ -157,34 +163,8 @@ serve(async (req) => {
           },
         },
       ],
-    };
-
-    console.log("Creating/updating Retell LLM...");
-    const llmResponse = await fetch("https://api.retellai.com/create-retell-llm", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${retellApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(llmConfig),
     });
 
-    if (!llmResponse.ok) {
-      const errorText = await llmResponse.text();
-      console.error("Retell LLM API error:", llmResponse.status, errorText);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Retell LLM API error: ${llmResponse.status} - ${errorText}`,
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    const llmData = await llmResponse.json();
     const llmId = llmData.llm_id;
 
     if (!llmId) {
@@ -207,109 +187,68 @@ serve(async (req) => {
     // Step 2: Create or update Retell Agent
     // -------------------------------------------
     const agentConfig = {
-      agent_name: `${restaurant.name} - Voice Assistant`,
-      voice_id: "21m00Tcm4TlvDq8ikWAM", // Make sure this voice_id exists in your Retell workspace
-      language: "en-US",
       response_engine: {
-        type: "retell-llm",
+        type: "retell-llm" as const,
         llm_id: llmId,
       },
+      agent_name: `${restaurant.name} - Voice Assistant`,
+      voice_id: "21m00Tcm4TlvDq8ikWAM",
+      language: "en-US" as const,
+      llm_websocket_url: `${supabaseUrl}/functions/v1/retell-webhook`,
       enable_backchannel: true,
       webhook_url: webhookUrl,
       boosted_keywords: ["order", "delivery", "pickup", "spice", "vegetarian"],
     };
 
     let agentId: string | null = existingAgentId;
-    let method: "POST" | "PATCH" = agentId ? "PATCH" : "POST";
-    let agentUrl =
-      method === "PATCH" ? `https://api.retellai.com/agent/${agentId}` : "https://api.retellai.com/agent";
 
-    console.log("Retell Agent API request:", {
-      method,
-      url: agentUrl,
-      hasExistingAgentId: !!existingAgentId,
-    });
+    try {
+      let agentData;
+      
+      if (agentId) {
+        // Update existing agent
+        console.log("Updating existing Retell agent:", agentId);
+        try {
+          agentData = await retellClient.agent.update(agentId, agentConfig);
+          console.log("Retell agent updated:", agentData.agent_id);
+        } catch (updateError: any) {
+          // If agent not found, create a new one
+          if (updateError?.status === 404) {
+            console.warn("Retell agent not found for update; falling back to create");
+            agentData = await retellClient.agent.create(agentConfig);
+            console.log("Retell agent created:", agentData.agent_id);
+          } else {
+            throw updateError;
+          }
+        }
+      } else {
+        // Create new agent
+        console.log("Creating new Retell agent");
+        agentData = await retellClient.agent.create(agentConfig);
+        console.log("Retell agent created:", agentData.agent_id);
+      }
 
-    let retellResponse = await fetch(agentUrl, {
-      method,
-      headers: {
-        Authorization: `Bearer ${retellApiKey}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(agentConfig),
-    });
+      agentId = agentData.agent_id;
 
-    console.log("Retell Agent API response status:", retellResponse.status);
-
-    // If updating and we get 404, the agent doesn't exist anymore -> fallback to create
-    if (method === "PATCH" && retellResponse.status === 404) {
-      const errorText = await retellResponse.text();
-      console.warn("Retell agent not found for update; falling back to create. Response:", errorText);
-
-      method = "POST";
-      agentUrl = "https://api.retellai.com/agent";
-
-      retellResponse = await fetch(agentUrl, {
-        method,
-        headers: {
-          Authorization: `Bearer ${retellApiKey}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify(agentConfig),
-      });
-
-      console.log("Retell Agent API response status after create fallback:", retellResponse.status);
-    }
-
-    if (!retellResponse.ok) {
-      const errorText = await retellResponse.text();
-      console.error("Retell Agent API error:", retellResponse.status, errorText);
-
+      if (!agentId) {
+        console.error("Retell Agent response missing agent_id:", agentData);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Failed to get agent_id from Retell",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+    } catch (error: any) {
+      console.error("Retell Agent API error:", error);
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Retell Agent API error: ${retellResponse.status} - ${errorText}`,
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    const retellData = await retellResponse.json();
-    agentId = retellData.agent_id;
-
-    if (!agentId) {
-      console.error("Retell Agent response missing agent_id:", retellData);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Failed to get agent_id from Retell",
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    console.log("Retell agent created/updated:", agentId);
-
-    // Save agent ID back to the restaurant record
-    const { error: updateError } = await supabase
-      .from("restaurants")
-      .update({ retell_agent_id: agentId })
-      .eq("id", restaurantId);
-
-    if (updateError) {
-      console.error("Error updating restaurant with agent ID:", updateError);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Failed to save agent ID to database",
+          error: `Retell Agent API error: ${error.message || "Unknown error"}`,
         }),
         {
           status: 500,
