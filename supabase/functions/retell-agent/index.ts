@@ -103,7 +103,6 @@ serve(async (req) => {
       general_prompt: systemPrompt,
       begin_message: "Hello! How can I help you today?",
       model: "gpt-4o-mini",
-      starting_state: "agent_speaking",
       general_tools: [
         {
           type: "end_call",
