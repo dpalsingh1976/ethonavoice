@@ -222,7 +222,7 @@ serve(async (req) => {
     let agentId: string | null = existingAgentId;
     let method: "POST" | "PATCH" = agentId ? "PATCH" : "POST";
     let agentUrl =
-      method === "PATCH" ? `https://api.retellai.com/update-agent/${agentId}` : "https://api.retellai.com/create-agent";
+      method === "PATCH" ? `https://api.retellai.com/agent/${agentId}` : "https://api.retellai.com/agent";
 
     console.log("Retell Agent API request:", {
       method,
@@ -248,7 +248,7 @@ serve(async (req) => {
       console.warn("Retell agent not found for update; falling back to create. Response:", errorText);
 
       method = "POST";
-      agentUrl = "https://api.retellai.com/create-agent";
+      agentUrl = "https://api.retellai.com/agent";
 
       retellResponse = await fetch(agentUrl, {
         method,
