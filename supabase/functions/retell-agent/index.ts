@@ -1,7 +1,7 @@
 // supabase/functions/retell-agent/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Retell from "https://esm.sh/retell-sdk@4.8.0";
+import Retell from "https://esm.sh/retell-sdk@latest";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -191,12 +191,9 @@ serve(async (req) => {
         llm_id: llmId,
       },
       agent_name: `${restaurant.name} - Voice Assistant`,
-      voice_id: "21m00Tcm4TlvDq8ikWAM",
+      voice_id: "11labs-Adrian",
       language: "en-US" as const,
-      llm_websocket_url: `${supabaseUrl}/functions/v1/retell-webhook`,
-      enable_backchannel: true,
       webhook_url: webhookUrl,
-      boosted_keywords: ["order", "delivery", "pickup", "spice", "vegetarian"],
     };
 
     let agentId: string | null = existingAgentId;
@@ -244,6 +241,9 @@ serve(async (req) => {
       }
     } catch (error: any) {
       console.error("Retell Agent API error:", error);
+      console.error("Error details:", JSON.stringify(error, null, 2));
+      console.error("Error status:", error?.status);
+      console.error("Error response:", error?.error);
       return new Response(
         JSON.stringify({
           success: false,
