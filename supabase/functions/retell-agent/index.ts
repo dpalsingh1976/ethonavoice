@@ -239,6 +239,29 @@ serve(async (req) => {
           },
         );
       }
+
+      // Save agent_id to database
+      console.log("Saving agent_id to database:", agentId);
+      const { error: updateError } = await supabase
+        .from("restaurants")
+        .update({ retell_agent_id: agentId })
+        .eq("id", restaurantId);
+
+      if (updateError) {
+        console.error("Failed to update restaurant with agent_id:", updateError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Agent created but failed to save to database",
+          }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      console.log("Agent ID saved to database successfully");
     } catch (error: any) {
       console.error("Retell Agent API error:", error);
       console.error("Error details:", JSON.stringify(error, null, 2));
