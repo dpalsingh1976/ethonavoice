@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.retell-webhook]
 verify_jwt = false
+
+[functions.retell-create-order]
+verify_jwt = false
