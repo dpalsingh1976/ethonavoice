@@ -87,8 +87,9 @@ serve(async (req) => {
 
     const existingAgentId: string | null = restaurant.retell_agent_id ?? null;
 
-    // Webhook URL for Retell to call back into
-    const webhookUrl = `${supabaseUrl}/functions/v1/retell-webhook`;
+    // Webhook URLs for Retell to call back into
+    const generalWebhookUrl = `${supabaseUrl}/functions/v1/retell-webhook`;
+    const createOrderWebhookUrl = `${supabaseUrl}/functions/v1/retell-create-order`;
 
     // Initialize Retell client
     const retellClient = new Retell({
@@ -113,7 +114,7 @@ serve(async (req) => {
           type: "custom",
           name: "create_order",
           description: "Create a new order when customer confirms their complete order",
-          url: webhookUrl,
+          url: createOrderWebhookUrl,
           speak_after_execution: true,
           speak_during_execution: false,
           parameters: {
@@ -193,7 +194,7 @@ serve(async (req) => {
       agent_name: `${restaurant.name} - Voice Assistant`,
       voice_id: "11labs-Adrian",
       language: "en-US" as const,
-      webhook_url: webhookUrl,
+      webhook_url: generalWebhookUrl,
     };
 
     let agentId: string | null = existingAgentId;
