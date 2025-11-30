@@ -18,9 +18,10 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("Received payload:", JSON.stringify(payload, null, 2));
 
-    // Retell custom function payload format: { args: {...}, data: { call_id: "..." } }
+    // Retell custom function payload format: { call: {...}, args: {...}, data: { call_id: "..." } }
     const args = payload.args;
     const callId = payload.data?.call_id;
+    const agentId = payload.call?.agent_id;
 
     if (!args) {
       console.error("Missing args in payload");
@@ -32,19 +33,8 @@ serve(async (req) => {
       });
     }
 
-    console.log("Order args:", JSON.stringify(args, null, 2));
-    console.log("Call ID:", callId);
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get agent_id from the request headers (Retell sends this)
-    const agentId = req.headers.get("x-retell-agent-id");
-    
     if (!agentId) {
-      console.error("No agent_id in request headers");
+      console.error("No agent_id in payload");
       return new Response(JSON.stringify({ 
         result: "Error: Unable to identify restaurant" 
       }), {
@@ -53,7 +43,14 @@ serve(async (req) => {
       });
     }
 
+    console.log("Order args:", JSON.stringify(args, null, 2));
+    console.log("Call ID:", callId);
     console.log("Agent ID:", agentId);
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Find restaurant by agent_id
     const { data: restaurant, error: restaurantError } = await supabase
