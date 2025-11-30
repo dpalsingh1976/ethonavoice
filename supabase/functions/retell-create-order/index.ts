@@ -132,8 +132,12 @@ serve(async (req) => {
 
     // Return success result in Retell's expected format
     const orderNumber = order.id.substring(0, 8).toUpperCase();
+    const successMessage = `Perfect! Your order has been placed successfully. Your order number is ${orderNumber}. The total is $${args.total.toFixed(2)}. Thank you for your order!`;
+    
+    console.log("Returning success response to Retell:", successMessage);
+    
     return new Response(JSON.stringify({ 
-      result: `Perfect! Your order has been placed successfully. Your order number is ${orderNumber}. The total is $${args.total.toFixed(2)}. Thank you for your order!`
+      result: successMessage
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" }
