@@ -103,7 +103,7 @@ serve(async (req) => {
     const llmData = await retellClient.llm.create({
       general_prompt: systemPrompt,
       begin_message: "Hello! How can I help you today?",
-      model: "gpt-4o-mini",
+      model: "gpt-4.1-mini",
       general_tools: [
         {
           type: "end_call",

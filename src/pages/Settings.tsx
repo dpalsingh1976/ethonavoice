@@ -8,21 +8,23 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Phone, ArrowLeft, Save } from 'lucide-react';
-import { Restaurant, MenuItem } from '@/types/database';
+import { Phone, ArrowLeft, Save, Workflow } from 'lucide-react';
+import { Restaurant } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
+
+interface ExtendedRestaurant extends Restaurant {
+  retell_conversation_flow_id?: string;
+}
 
 const Settings = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  const [restaurant, setRestaurant] = useState<ExtendedRestaurant | null>(null);
   const [voiceSettings, setVoiceSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [creatingAssistant, setCreatingAssistant] = useState(false);
-  const [generatingPrompt, setGeneratingPrompt] = useState(false);
-  const [systemPrompt, setSystemPrompt] = useState('');
+  const [creatingFlow, setCreatingFlow] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -39,7 +41,7 @@ const Settings = () => {
         .single();
 
       if (error) throw error;
-      setRestaurant(data);
+      setRestaurant(data as ExtendedRestaurant);
 
       // Fetch voice settings
       const { data: voiceData, error: voiceError } = await supabase
@@ -64,11 +66,6 @@ const Settings = () => {
         closing_gu: '',
         notes_for_agent: ''
       });
-      
-      // Set system prompt if exists
-      if (voiceData?.system_prompt) {
-        setSystemPrompt(voiceData.system_prompt);
-      }
     } catch (error: any) {
       toast({
         title: 'Error loading settings',
@@ -122,7 +119,6 @@ const Settings = () => {
         .upsert({
           restaurant_id: restaurant.id,
           ...voiceSettings,
-          system_prompt: systemPrompt || null,
           updated_at: new Date().toISOString()
         });
 
@@ -143,93 +139,45 @@ const Settings = () => {
     }
   };
 
-  const handleGeneratePrompt = async () => {
+  const handleCreateConversationFlow = async () => {
     if (!restaurant) return;
 
-    setGeneratingPrompt(true);
+    setCreatingFlow(true);
     try {
-      // Fetch all data needed for prompt generation
-      const [hoursResult, categoriesResult, itemsResult] = await Promise.all([
-        supabase.from('restaurant_hours').select('*').eq('restaurant_id', restaurant.id),
-        supabase.from('menu_categories').select('*').eq('restaurant_id', restaurant.id).order('sort_order'),
-        supabase.from('menu_items').select('*').eq('restaurant_id', restaurant.id)
-      ]);
-
-      // Import the utility function
-      const { generateSystemPrompt } = await import('@/lib/voice-agent-utils');
-      
-      const prompt = generateSystemPrompt(
-        restaurant,
-        voiceSettings || {},
-        hoursResult.data || [],
-        categoriesResult.data || [],
-        (itemsResult.data || []) as MenuItem[]
-      );
-
-      setSystemPrompt(prompt);
-      
-      toast({
-        title: 'System prompt generated',
-        description: 'Review and edit the prompt below before creating your assistant.',
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Error generating prompt',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setGeneratingPrompt(false);
-    }
-  };
-
-  const handleCreateVoiceAgent = async () => {
-    if (!restaurant) return;
-    
-    if (!systemPrompt) {
-      toast({
-        title: 'No system prompt',
-        description: 'Please generate a system prompt first.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setCreatingAssistant(true);
-    try {
-      // First save voice settings with the system prompt
+      // First save voice settings
       await handleSaveVoiceSettings();
 
-      // Then create Retell agent with the custom prompt
-      const { data, error } = await supabase.functions.invoke('retell-agent', {
-        body: { 
-          restaurantId: restaurant.id,
-          systemPrompt: systemPrompt 
-        }
+      // Create Conversation Flow via edge function
+      const { data, error } = await supabase.functions.invoke('retell-conversation-flow', {
+        body: { restaurantId: restaurant.id }
       });
 
       if (error) throw error;
 
       if (data.success) {
-        // Update local restaurant state with new agent ID
-        setRestaurant(prev => prev ? { ...prev, retell_agent_id: data.agentId } : null);
+        // Update local restaurant state with new IDs
+        setRestaurant(prev => prev ? { 
+          ...prev, 
+          retell_agent_id: data.agentId,
+          retell_conversation_flow_id: data.conversationFlowId 
+        } : null);
         
         toast({
-          title: 'Voice Agent Created!',
-          description: `Agent ID: ${data.agentId}`,
+          title: 'Voice Flow Created!',
+          description: `Your conversation flow and agent have been set up successfully.`,
         });
       } else {
-        throw new Error(data.error || 'Failed to create agent');
+        throw new Error(data.error || 'Failed to create conversation flow');
       }
     } catch (error: any) {
-      console.error('Error creating voice agent:', error);
+      console.error('Error creating conversation flow:', error);
       toast({
-        title: 'Error creating agent',
+        title: 'Error creating flow',
         description: error.message || 'Please check your Retell API key and try again.',
         variant: 'destructive',
       });
     } finally {
-      setCreatingAssistant(false);
+      setCreatingFlow(false);
     }
   };
 
@@ -345,74 +293,49 @@ const Settings = () => {
               <div className="space-y-6">
                 <Card className="border-border/50">
                   <CardHeader>
-                    <CardTitle>System Prompt Configuration</CardTitle>
-                    <CardDescription>
-                      Generate and review the AI assistant's instructions before creating
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Button 
-                      onClick={handleGeneratePrompt} 
-                      disabled={generatingPrompt}
-                      variant="outline"
-                      className="w-full"
-                    >
-                      {generatingPrompt ? 'Generating...' : 'Generate System Prompt'}
-                    </Button>
-                    
-                    {systemPrompt && (
-                      <div className="space-y-2">
-                        <Label htmlFor="system_prompt">System Prompt</Label>
-                        <Textarea
-                          id="system_prompt"
-                          value={systemPrompt}
-                          onChange={(e) => setSystemPrompt(e.target.value)}
-                          rows={20}
-                          className="font-mono text-xs"
-                          placeholder="Generate a system prompt to see it here..."
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Review and customize the AI assistant's instructions. This defines how your assistant will behave and respond to customers.
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="border-border/50">
-                  <CardHeader>
-                    <CardTitle>Voice Agent Status</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <Workflow className="h-5 w-5" />
+                      Voice Flow Status
+                    </CardTitle>
                     <CardDescription>
                       {restaurant?.retell_agent_id 
-                        ? 'Your voice assistant is active' 
-                        : 'Create a voice assistant to start taking orders'}
+                        ? 'Your voice assistant is active with a conversation flow' 
+                        : 'Create a conversation flow to start taking orders'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {restaurant?.retell_agent_id && (
-                      <div className="rounded-lg bg-primary/10 p-4">
-                        <p className="text-sm font-medium text-foreground">Agent ID</p>
-                        <p className="text-xs text-muted-foreground font-mono mt-1">
-                          {restaurant.retell_agent_id}
-                        </p>
+                    {restaurant?.retell_conversation_flow_id && (
+                      <div className="rounded-lg bg-primary/10 p-4 space-y-2">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Conversation Flow ID</p>
+                          <p className="text-xs text-muted-foreground font-mono mt-1">
+                            {restaurant.retell_conversation_flow_id}
+                          </p>
+                        </div>
+                        {restaurant?.retell_agent_id && (
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Agent ID</p>
+                            <p className="text-xs text-muted-foreground font-mono mt-1">
+                              {restaurant.retell_agent_id}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
                     <Button 
-                      onClick={handleCreateVoiceAgent} 
-                      disabled={creatingAssistant || !systemPrompt}
+                      onClick={handleCreateConversationFlow} 
+                      disabled={creatingFlow}
                       className="w-full"
                     >
-                      <Save className="mr-2 h-4 w-4" />
-                      {creatingAssistant 
-                        ? 'Creating Agent...' 
-                        : restaurant?.retell_agent_id 
-                          ? 'Update Voice Agent' 
-                          : 'Create Voice Agent'}
+                      <Workflow className="mr-2 h-4 w-4" />
+                      {creatingFlow 
+                        ? 'Creating Flow...' 
+                        : restaurant?.retell_conversation_flow_id 
+                          ? 'Update Voice Flow' 
+                          : 'Create Voice Flow'}
                     </Button>
                     <p className="text-xs text-muted-foreground">
-                      {!systemPrompt 
-                        ? 'Generate a system prompt first before creating your agent.' 
-                        : 'This will create/update your voice agent with your custom prompt.'}
+                      This creates a structured conversation flow that guides callers through ordering, answering questions, and more.
                     </p>
                   </CardContent>
                 </Card>
@@ -561,7 +484,7 @@ const Settings = () => {
                         rows={4}
                       />
                       <p className="text-xs text-muted-foreground">
-                        These instructions will guide the AI on how to handle specific situations or promote special offers.
+                        These instructions will be included in the conversation flow's global prompt.
                       </p>
                     </div>
 

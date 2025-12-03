@@ -325,6 +325,7 @@ export type Database = {
           pos_api_key: string | null
           pos_type: Database["public"]["Enums"]["pos_type"]
           retell_agent_id: string | null
+          retell_conversation_flow_id: string | null
           timezone: string
           updated_at: string
           vapi_assistant_id: string | null
@@ -340,6 +341,7 @@ export type Database = {
           pos_api_key?: string | null
           pos_type?: Database["public"]["Enums"]["pos_type"]
           retell_agent_id?: string | null
+          retell_conversation_flow_id?: string | null
           timezone?: string
           updated_at?: string
           vapi_assistant_id?: string | null
@@ -355,6 +357,7 @@ export type Database = {
           pos_api_key?: string | null
           pos_type?: Database["public"]["Enums"]["pos_type"]
           retell_agent_id?: string | null
+          retell_conversation_flow_id?: string | null
           timezone?: string
           updated_at?: string
           vapi_assistant_id?: string | null
