@@ -479,7 +479,7 @@ Then move to end_call.
       language: 'en-US',
       webhook_url: generalWebhookUrl,
       post_call_analysis_data: [
-        { type: 'transcript', name: 'call_transcript' },
+        { type: 'transcript', name: 'call_transcript', description: 'Full transcript of the call' },
         { type: 'custom_analysis', name: 'order_summary', description: 'Summary of any order placed during the call' },
       ],
     };
