@@ -189,7 +189,7 @@ ${menuText}
           id: 'welcome',
           type: 'conversation',
           instruction: {
-            type: 'static_sentence',
+            type: 'static_text',
             text: voiceSettings.greeting_en || `Thank you for calling {{restaurant_name}}! How can I help you today?`,
           },
           edges: [
@@ -279,32 +279,19 @@ If they confirm, go to save_order.
           ],
         },
 
-        // 4) Save Order (function node)
+        // 4) Save Order (tool call node)
         {
           id: 'save_order',
-          type: 'function',
-          instruction: {
-            type: 'tool_call',
-            tool_name: 'save_pickup_order',
+          type: 'tool_call',
+          tool_id: 'save_pickup_order',
+          success_edge: {
+            id: 'edge_save_success',
+            destination_node_id: 'confirm_pickup',
           },
-          edges: [
-            {
-              id: 'edge_save_success',
-              transition_condition: {
-                type: 'prompt',
-                prompt: 'Order saved successfully',
-              },
-              destination_node_id: 'confirm_pickup',
-            },
-            {
-              id: 'edge_save_fail',
-              transition_condition: {
-                type: 'prompt',
-                prompt: 'There was an error saving the order',
-              },
-              destination_node_id: 'error_node',
-            },
-          ],
+          failure_edge: {
+            id: 'edge_save_fail',
+            destination_node_id: 'error_node',
+          },
         },
 
         // 5) Confirm Pickup
@@ -312,7 +299,7 @@ If they confirm, go to save_order.
           id: 'confirm_pickup',
           type: 'conversation',
           instruction: {
-            type: 'static_sentence',
+            type: 'static_text',
             text: voiceSettings.closing_en || 
               `Your pickup order is confirmed! We will have it ready in about {{default_pickup_eta}}. Thank you for calling {{restaurant_name}}.`,
           },
@@ -389,7 +376,7 @@ Then move to end_call.
           id: 'error_node',
           type: 'conversation',
           instruction: {
-            type: 'static_sentence',
+            type: 'static_text',
             text: 'Sorry, something went wrong while saving your order. Would you like me to try again?',
           },
           edges: [
