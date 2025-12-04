@@ -478,10 +478,6 @@ Then move to end_call.
       voice_id: '11labs-Adrian',
       language: 'en-US',
       webhook_url: generalWebhookUrl,
-      post_call_analysis_data: [
-        { type: 'transcript', name: 'call_transcript', description: 'Full transcript of the call' },
-        { type: 'custom_analysis', name: 'order_summary', description: 'Summary of any order placed during the call' },
-      ],
     };
 
     console.log('Creating agent with conversation flow...');
