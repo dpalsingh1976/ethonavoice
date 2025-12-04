@@ -279,19 +279,43 @@ If they confirm, go to save_order.
           ],
         },
 
-        // 4) Save Order (tool call node)
+        // 4) Save Order - LLM calls the tool automatically
         {
           id: 'save_order',
-          type: 'tool_call',
-          tool_id: 'save_pickup_order',
-          success_edge: {
-            id: 'edge_save_success',
-            destination_node_id: 'confirm_pickup',
+          type: 'conversation',
+          instruction: {
+            type: 'prompt',
+            text: `
+You MUST NOW call the save_pickup_order tool to save the order.
+Pass all collected information:
+- customer_name: the caller's name
+- customer_phone: their phone number
+- items: array of {name, quantity, notes} for each item ordered
+- pickup_eta: the estimated pickup time
+
+CALL THE TOOL IMMEDIATELY. Do not say anything until the tool returns a result.
+After the tool succeeds, transition to confirm_pickup.
+If the tool fails, transition to error_node.
+`,
           },
-          failure_edge: {
-            id: 'edge_save_fail',
-            destination_node_id: 'error_node',
-          },
+          edges: [
+            {
+              id: 'edge_save_success',
+              transition_condition: {
+                type: 'prompt',
+                prompt: 'The save_pickup_order tool returned successfully',
+              },
+              destination_node_id: 'confirm_pickup',
+            },
+            {
+              id: 'edge_save_fail',
+              transition_condition: {
+                type: 'prompt',
+                prompt: 'The save_pickup_order tool failed or returned an error',
+              },
+              destination_node_id: 'error_node',
+            },
+          ],
         },
 
         // 5) Confirm Pickup
