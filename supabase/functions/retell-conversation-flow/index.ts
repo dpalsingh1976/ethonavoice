@@ -435,7 +435,7 @@ Then move to end_call.
     console.log('Creating conversation flow for restaurant:', restaurant.name);
 
     // Create Conversation Flow via Retell API
-    const flowResponse = await fetch('https://api.retellai.com/v2/create-conversation-flow', {
+    const flowResponse = await fetch('https://api.retellai.com/v2/conversation-flow', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RETELL_API_KEY}`,
@@ -475,7 +475,7 @@ Then move to end_call.
 
     console.log('Creating agent with conversation flow...');
 
-    const agentResponse = await fetch('https://api.retellai.com/v2/create-agent', {
+    const agentResponse = await fetch('https://api.retellai.com/v2/agent', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RETELL_API_KEY}`,
