@@ -159,7 +159,7 @@ serve(async (req) => {
 
     // Build Conversation Flow
     const conversationFlowPayload = {
-      model_choice: { type: 'cascading', model: 'gpt-4o' },
+      model_choice: { type: 'cascading', model: 'gpt-4.1' },
       start_speaker: 'agent',
       global_prompt: `
 You are a friendly phone assistant for ${restaurant.name}, an Indian restaurant.
@@ -435,7 +435,7 @@ Then move to end_call.
     console.log('Creating conversation flow for restaurant:', restaurant.name);
 
     // Create Conversation Flow via Retell API
-    const flowResponse = await fetch('https://api.retellai.com/v2/conversation-flow', {
+    const flowResponse = await fetch('https://api.retellai.com/create-conversation-flow', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RETELL_API_KEY}`,
@@ -475,7 +475,7 @@ Then move to end_call.
 
     console.log('Creating agent with conversation flow...');
 
-    const agentResponse = await fetch('https://api.retellai.com/v2/agent', {
+    const agentResponse = await fetch('https://api.retellai.com/create-agent', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RETELL_API_KEY}`,
