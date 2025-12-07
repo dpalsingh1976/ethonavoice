@@ -127,10 +127,10 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch restaurant data
+    // Fetch restaurant data including knowledge base ID
     const { data: restaurant, error: restaurantError } = await supabase
       .from('restaurants')
-      .select('*')
+      .select('*, retell_knowledge_base_id')
       .eq('id', restaurantId)
       .single();
 
@@ -469,7 +469,8 @@ Then move to end_call.
     // Now create an agent that uses this conversation flow
     const generalWebhookUrl = `${supabaseUrl}/functions/v1/retell-webhook`;
 
-    const agentPayload = {
+    // Build agent payload with optional knowledge base
+    const agentPayload: Record<string, unknown> = {
       response_engine: {
         type: 'conversation-flow',
         conversation_flow_id: conversationFlowId,
@@ -479,6 +480,16 @@ Then move to end_call.
       language: 'en-US',
       webhook_url: generalWebhookUrl,
     };
+
+    // Attach knowledge base if available
+    if (restaurant.retell_knowledge_base_id) {
+      agentPayload.knowledge_base_ids = [restaurant.retell_knowledge_base_id];
+      agentPayload.knowledge_base_config = {
+        top_k: 3,
+        filter_score: 0.5,
+      };
+      console.log('Attaching knowledge base:', restaurant.retell_knowledge_base_id);
+    }
 
     console.log('Creating agent with conversation flow...');
 
