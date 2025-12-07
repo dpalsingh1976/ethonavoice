@@ -434,6 +434,7 @@ Then move to end_call.
         {
           type: 'custom',
           name: 'save_pickup_order',
+          tool_id: 'save_pickup_order',
           description: 'Save the pickup order to the restaurant system. Call this tool immediately after the customer confirms their order.',
           url: orderWebhookUrl,
           speak_after_execution: true,
