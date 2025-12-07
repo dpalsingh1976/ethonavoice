@@ -434,11 +434,51 @@ Then move to end_call.
         {
           type: 'custom',
           name: 'save_pickup_order',
-          description: 'Save the pickup order to the restaurant system',
-          tool_id: 'save_pickup_order',
+          description: 'Save the pickup order to the restaurant system. Call this tool immediately after the customer confirms their order.',
           url: orderWebhookUrl,
-          method: 'POST',
           speak_after_execution: true,
+          speak_during_execution: true,
+          execution_message_description: 'One moment while I place your order...',
+          parameters: {
+            type: 'object',
+            properties: {
+              customerName: {
+                type: 'string',
+                description: 'The customer name for the pickup order',
+              },
+              customerPhone: {
+                type: 'string',
+                description: 'The customer phone number',
+              },
+              items: {
+                type: 'array',
+                description: 'Array of items in the order',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string', description: 'Menu item name' },
+                    quantity: { type: 'number', description: 'Quantity ordered' },
+                    price: { type: 'number', description: 'Unit price of the item' },
+                    spiceLevel: { type: 'string', description: 'Spice level if applicable' },
+                  },
+                  required: ['name', 'quantity', 'price'],
+                },
+              },
+              subtotal: {
+                type: 'number',
+                description: 'Order subtotal before tax',
+              },
+              tax: {
+                type: 'number',
+                description: 'Tax amount',
+              },
+              total: {
+                type: 'number',
+                description: 'Total order amount including tax',
+              },
+            },
+            required: ['customerName', 'customerPhone', 'items', 'subtotal', 'total'],
+          },
         },
       ],
     };
