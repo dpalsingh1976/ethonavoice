@@ -14,7 +14,7 @@ const Orders = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<(Order & { items: OrderItem[] })[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
 
@@ -35,7 +35,7 @@ const Orders = () => {
 
       if (restError) throw restError;
 
-      // Then get orders
+      // Then get orders with items
       const { data, error } = await supabase
         .from('orders')
         .select('*')
@@ -44,7 +44,18 @@ const Orders = () => {
 
       if (error) throw error;
 
-      setOrders(data || []);
+      // Fetch order items for each order
+      const ordersWithItems = await Promise.all(
+        (data || []).map(async (order) => {
+          const { data: items } = await supabase
+            .from('order_items')
+            .select('*')
+            .eq('order_id', order.id);
+          return { ...order, items: items || [] };
+        })
+      );
+
+      setOrders(ordersWithItems);
     } catch (error: any) {
       toast({
         title: 'Error loading orders',
@@ -198,6 +209,29 @@ const Orders = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {/* Order Items */}
+                  {order.items && order.items.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="mb-2 text-sm font-semibold text-muted-foreground">
+                        Order Items
+                      </h4>
+                      <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
+                        <ul className="space-y-2">
+                          {order.items.map((item) => (
+                            <li key={item.id} className="flex items-center justify-between text-sm">
+                              <span className="font-medium text-foreground">
+                                {item.name}
+                              </span>
+                              <span className="text-muted-foreground">
+                                x{item.quantity} • ${item.unit_price.toLocaleString('en-US')}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mb-4">
                     <h4 className="mb-2 text-sm font-semibold text-muted-foreground">
                       Change Status
