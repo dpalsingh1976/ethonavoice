@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -8,12 +8,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Phone, ArrowLeft, Save, Workflow } from 'lucide-react';
+import { Phone, ArrowLeft, Save, Workflow, Upload, BookOpen, CheckCircle } from 'lucide-react';
 import { Restaurant } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 
 interface ExtendedRestaurant extends Restaurant {
   retell_conversation_flow_id?: string;
+  retell_knowledge_base_id?: string;
 }
 
 const Settings = () => {
@@ -25,6 +26,8 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creatingFlow, setCreatingFlow] = useState(false);
+  const [uploadingKb, setUploadingKb] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -181,6 +184,54 @@ const Settings = () => {
     }
   };
 
+  const handleKnowledgeBaseUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !restaurant) return;
+
+    setUploadingKb(true);
+    try {
+      // Read file content
+      const content = await file.text();
+      
+      // Call edge function to create knowledge base
+      const { data, error } = await supabase.functions.invoke('retell-knowledge-base', {
+        body: { 
+          restaurantId: restaurant.id,
+          kbContent: content
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setRestaurant(prev => prev ? { 
+          ...prev, 
+          retell_knowledge_base_id: data.knowledgeBaseId 
+        } : null);
+        
+        toast({
+          title: 'Knowledge Base Uploaded!',
+          description: `Successfully processed ${data.itemCount} Q&A items.`,
+        });
+      } else {
+        throw new Error(data.error || 'Failed to upload knowledge base');
+      }
+    } catch (error: any) {
+      console.error('Error uploading knowledge base:', error);
+      toast({
+        title: 'Error uploading knowledge base',
+        description: error.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingKb(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -286,7 +337,68 @@ const Settings = () => {
                     {saving ? 'Saving...' : 'Save Changes'}
                   </Button>
                 </CardContent>
-              </Card>
+                </Card>
+
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5" />
+                      Knowledge Base
+                    </CardTitle>
+                    <CardDescription>
+                      Upload a Q&A file to help your voice agent answer common questions
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {restaurant?.retell_knowledge_base_id && (
+                      <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-green-600">
+                        <CheckCircle className="h-5 w-5" />
+                        <div>
+                          <p className="text-sm font-medium">Knowledge Base Active</p>
+                          <p className="text-xs opacity-80 font-mono">
+                            {restaurant.retell_knowledge_base_id}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label>Upload Q&A File</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Upload a text or RTF file with Q&A pairs. Format each pair as:
+                        <br />
+                        <code className="bg-muted px-1 rounded">Q: Your question here</code>
+                        <br />
+                        <code className="bg-muted px-1 rounded">A: The answer here</code>
+                      </p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".txt,.rtf,.md"
+                        onChange={handleKnowledgeBaseUpload}
+                        className="hidden"
+                        id="kb-file-input"
+                      />
+                      <Button 
+                        variant="outline" 
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingKb}
+                        className="w-full"
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        {uploadingKb 
+                          ? 'Uploading...' 
+                          : restaurant?.retell_knowledge_base_id 
+                            ? 'Replace Knowledge Base' 
+                            : 'Upload Knowledge Base'}
+                      </Button>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground">
+                      The knowledge base helps your voice agent answer questions about menu items, hours, policies, and more.
+                    </p>
+                  </CardContent>
+                </Card>
             </TabsContent>
 
             <TabsContent value="voice">
