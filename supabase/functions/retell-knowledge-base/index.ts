@@ -114,11 +114,10 @@ serve(async (req) => {
       }
     }
 
-    // Create new knowledge base
-    const kbPayload = {
-      knowledge_base_name: `${restaurant.name} FAQ KB`,
-      knowledge_base_texts: qaItems,
-    };
+    // Create new knowledge base using multipart/form-data
+    const formData = new FormData();
+    formData.append('knowledge_base_name', `${restaurant.name} FAQ KB`);
+    formData.append('knowledge_base_texts', JSON.stringify(qaItems));
 
     console.log('Creating knowledge base with', qaItems.length, 'items');
 
@@ -126,9 +125,8 @@ serve(async (req) => {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RETELL_API_KEY}`,
-        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(kbPayload),
+      body: formData,
     });
 
     if (!kbResponse.ok) {
