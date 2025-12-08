@@ -65,7 +65,7 @@ serve(async (req) => {
       const { data: restaurants, error: arrayError } = await supabase
         .from("restaurants")
         .select("*")
-        .contains("retell_agent_ids", [agentId]);
+        .filter("retell_agent_ids", "cs", JSON.stringify([agentId]));
       
       if (arrayError) {
         console.error("Error searching retell_agent_ids:", arrayError);
