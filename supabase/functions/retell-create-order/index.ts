@@ -52,12 +52,28 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Find restaurant by agent_id
-    const { data: restaurant, error: restaurantError } = await supabase
+    // Find restaurant by agent_id - first try exact match
+    let { data: restaurant, error: restaurantError } = await supabase
       .from("restaurants")
       .select("*")
       .eq("retell_agent_id", agentId)
       .maybeSingle();
+
+    // If not found, try searching in retell_agent_ids array
+    if (!restaurant) {
+      console.log("Agent not found in retell_agent_id, checking retell_agent_ids array...");
+      const { data: restaurants, error: arrayError } = await supabase
+        .from("restaurants")
+        .select("*")
+        .contains("retell_agent_ids", [agentId]);
+      
+      if (arrayError) {
+        console.error("Error searching retell_agent_ids:", arrayError);
+      } else if (restaurants && restaurants.length > 0) {
+        restaurant = restaurants[0];
+        console.log("Found restaurant via retell_agent_ids array:", restaurant.name);
+      }
+    }
 
     if (restaurantError || !restaurant) {
       console.error("Restaurant not found for agent:", agentId, restaurantError);
