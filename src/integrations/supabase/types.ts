@@ -168,6 +168,7 @@ export type Database = {
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
           tax: number
+          ticket_printed_at: string | null
           total_amount: number
           updated_at: string
         }
@@ -184,6 +185,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["order_status"]
           subtotal: number
           tax?: number
+          ticket_printed_at?: string | null
           total_amount: number
           updated_at?: string
         }
@@ -200,6 +202,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           tax?: number
+          ticket_printed_at?: string | null
           total_amount?: number
           updated_at?: string
         }
