@@ -81,6 +81,7 @@ export interface Order {
   currency: string;
   language_used: string;
   status: OrderStatus;
+  ticket_printed_at?: string;
   created_at: string;
   updated_at: string;
 }

@@ -5,10 +5,11 @@ import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Phone, ArrowLeft, Calendar, User, MapPin, Package } from 'lucide-react';
+import { Phone, ArrowLeft, Calendar, User, MapPin, Package, Printer } from 'lucide-react';
 import { Order, OrderItem } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { printKitchenTicket } from '@/components/KitchenTicket';
 
 const Orders = () => {
   const { user } = useAuth();
@@ -85,6 +86,39 @@ const Orders = () => {
     } catch (error: any) {
       toast({
         title: 'Error updating order',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handlePrintTicket = async (order: Order & { items: OrderItem[] }) => {
+    try {
+      // Print the ticket
+      printKitchenTicket(order, 'HONEST RESTAURANT', '60 Main Ave, Clifton, NJ');
+      
+      // Update ticket_printed_at in database
+      const { error } = await supabase
+        .from('orders')
+        .update({ ticket_printed_at: new Date().toISOString() })
+        .eq('id', order.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setOrders(prev => prev.map(o => 
+        o.id === order.id 
+          ? { ...o, ticket_printed_at: new Date().toISOString() }
+          : o
+      ));
+
+      toast({
+        title: 'Ticket printed',
+        description: 'Kitchen ticket has been sent to printer',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error printing ticket',
         description: error.message,
         variant: 'destructive',
       });
@@ -205,6 +239,16 @@ const Orders = () => {
                       <span className="text-sm text-muted-foreground">
                         Language: {order.language_used.toUpperCase()}
                       </span>
+                      {order.ticket_printed_at && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Printer className="h-3 w-3" />
+                          Printed at {new Date(order.ticket_printed_at).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true,
+                          })}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
@@ -232,24 +276,34 @@ const Orders = () => {
                     </div>
                   )}
 
-                  <div className="mb-4">
-                    <h4 className="mb-2 text-sm font-semibold text-muted-foreground">
-                      Change Status
-                    </h4>
-                    <Select
-                      value={order.status}
-                      onValueChange={(value) => updateOrderStatus(order.id, value as 'new' | 'in_progress' | 'completed' | 'cancelled')}
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="flex-1">
+                      <h4 className="mb-2 text-sm font-semibold text-muted-foreground">
+                        Change Status
+                      </h4>
+                      <Select
+                        value={order.status}
+                        onValueChange={(value) => updateOrderStatus(order.id, value as 'new' | 'in_progress' | 'completed' | 'cancelled')}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="new">New</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => handlePrintTicket(order)}
+                      className="flex items-center gap-2"
                     >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">New</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <Printer className="h-4 w-4" />
+                      Print Kitchen Ticket
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
