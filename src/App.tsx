@@ -12,6 +12,7 @@ import Orders from "./pages/Orders";
 import Settings from "./pages/Settings";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
+import VoiceTest from "./pages/VoiceTest";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +58,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route path="/dev/voice-test" element={<VoiceTest />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

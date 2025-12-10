@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { indianMenuDictionary, enrichMenuItemsWithVariants, normalizeTranscriptToMenuItems } from "../_shared/menuDictionary.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -87,6 +88,37 @@ serve(async (req) => {
 
     console.log("Found restaurant:", restaurant.name);
 
+    // Fetch menu items to build normalization dictionary
+    const { data: menuItems } = await supabase
+      .from("menu_items")
+      .select("id, name, category_id")
+      .eq("restaurant_id", restaurant.id)
+      .eq("is_available", true);
+
+    // Enrich with phonetic variants
+    const enrichedMenuItems = enrichMenuItemsWithVariants(
+      menuItems || [],
+      indianMenuDictionary
+    );
+
+    // Normalize item names in the order
+    const normalizedItems = args.items?.map((item: any) => {
+      const originalName = item.name;
+      const normResult = normalizeTranscriptToMenuItems(originalName, enrichedMenuItems, 0.7);
+      
+      if (normResult.matches.length > 0) {
+        const bestMatch = normResult.matches[0];
+        console.log(`Normalized item: "${originalName}" -> "${bestMatch.canonicalName}" (similarity: ${bestMatch.similarity.toFixed(2)})`);
+        return {
+          ...item,
+          name: bestMatch.canonicalName,
+          original_name: originalName // Keep original for logging
+        };
+      }
+      
+      return item;
+    }) || [];
+
     // Create order
     const { data: order, error: orderError } = await supabase
       .from("orders")
@@ -118,11 +150,11 @@ serve(async (req) => {
 
     console.log("Order created successfully:", order.id);
 
-    // Create order items
-    if (args.items && Array.isArray(args.items)) {
-      const orderItems = args.items.map((item: any) => ({
+    // Create order items with normalized names
+    if (normalizedItems.length > 0) {
+      const orderItems = normalizedItems.map((item: any) => ({
         order_id: order.id,
-        name: item.name,
+        name: item.name, // Use normalized name
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.price * item.quantity,

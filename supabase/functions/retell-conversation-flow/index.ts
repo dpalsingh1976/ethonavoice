@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { indianMenuDictionary, buildASRHints, enrichMenuItemsWithVariants } from "../_shared/menuDictionary.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -154,10 +155,18 @@ serve(async (req) => {
     const menuText = formatMenu(categories, menuItems);
     const hoursText = formatHours(hours);
 
+    // Build ASR hints from menu items enriched with phonetic variants
+    const enrichedMenuItems = enrichMenuItemsWithVariants(
+      menuItems.map((item: MenuItem) => ({ id: item.id, name: item.name, category_id: item.category_id })),
+      indianMenuDictionary
+    );
+    const asrHints = buildASRHints(enrichedMenuItems);
+    console.log(`Built ${asrHints.length} ASR hints for restaurant: ${restaurant.name}`);
+
     // Build the webhook URL for order creation
     const orderWebhookUrl = `${supabaseUrl}/functions/v1/retell-create-order`;
 
-    // Build Conversation Flow
+    // Build Conversation Flow with enhanced pronunciation guidance
     const conversationFlowPayload = {
       model_choice: { type: 'cascading', model: 'gpt-4.1' },
       start_speaker: 'agent',
@@ -165,6 +174,14 @@ serve(async (req) => {
 You are a friendly phone assistant for ${restaurant.name}, an Indian restaurant.
 You answer questions, help callers place pickup orders, confirm details, and end calls politely.
 Keep answers short and clear. Be warm and professional.
+
+IMPORTANT - PRONUNCIATION HANDLING:
+You are taking food orders for an Indian restaurant. Customers may mispronounce menu items in various ways:
+- "pow bhaji", "pao bhaji", "pav bhajee" all mean "Pav Bhaji"
+- "wada pav", "vada pow", "wadapav" all mean "Vada Pav"
+- "masala dosai", "masaala dosa" all mean "Masala Dosa"
+The text you receive may already be normalized, but if you see something close to a known menu item, assume it is that item and confirm gently.
+Always use the correct canonical menu item name when confirming orders.
 
 ${voiceSettings.notes_for_agent ? `SPECIAL INSTRUCTIONS:\n${voiceSettings.notes_for_agent}\n` : ''}
 
@@ -225,6 +242,7 @@ Ask what they would like to order and add items one by one.
 Rules:
 - Ask 1 question at a time.
 - Confirm item name, quantity, and any options (spice level, etc.).
+- If an item sounds similar to a menu item (like "pow bhaji" for "Pav Bhaji"), confirm: "Did you mean Pav Bhaji?"
 - If item not found, offer 2-3 similar menu items instead.
 - When the caller says they're done (e.g. "that's it", "nothing else"), stop adding items and move to order_summary.
 `,
@@ -290,7 +308,7 @@ You MUST NOW call the save_pickup_order tool to save the order.
 Pass all collected information:
 - customer_name: the caller's name
 - customer_phone: their phone number
-- items: array of {name, quantity, notes} for each item ordered
+- items: array of {name, quantity, notes} for each item ordered (USE CANONICAL MENU ITEM NAMES, not mispronounced versions)
 - pickup_eta: the estimated pickup time
 
 CALL THE TOOL IMMEDIATELY. Do not say anything until the tool returns a result.
@@ -457,7 +475,7 @@ Then move to end_call.
                 items: {
                   type: 'object',
                   properties: {
-                    name: { type: 'string', description: 'Menu item name' },
+                    name: { type: 'string', description: 'Menu item name (use canonical name like "Pav Bhaji", not mispronounced versions)' },
                     quantity: { type: 'number', description: 'Quantity ordered' },
                     price: { type: 'number', description: 'Unit price of the item' },
                     spiceLevel: { type: 'string', description: 'Spice level if applicable' },
@@ -510,7 +528,7 @@ Then move to end_call.
     // Now create an agent that uses this conversation flow
     const generalWebhookUrl = `${supabaseUrl}/functions/v1/retell-webhook`;
 
-    // Build agent payload with optional knowledge base
+    // Build agent payload with optional knowledge base and ASR hints
     const agentPayload: Record<string, unknown> = {
       response_engine: {
         type: 'conversation-flow',
@@ -521,6 +539,12 @@ Then move to end_call.
       language: 'en-US',
       webhook_url: generalWebhookUrl,
     };
+
+    // Add ASR boosted keywords for better recognition of Indian food names
+    if (asrHints.length > 0) {
+      agentPayload.boosted_keywords = asrHints.slice(0, 100); // Retell may have limits
+      console.log(`Added ${Math.min(asrHints.length, 100)} boosted keywords for ASR`);
+    }
 
     // Attach knowledge base if available
     if (restaurant.retell_knowledge_base_id) {
@@ -574,6 +598,7 @@ Then move to end_call.
         success: true,
         conversationFlowId,
         agentId,
+        asrHintsCount: asrHints.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
