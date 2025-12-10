@@ -156,12 +156,20 @@ serve(async (req) => {
     const hoursText = formatHours(hours);
 
     // Build ASR hints from menu items enriched with phonetic variants
+    // Also include the full Indian menu dictionary as fallback for better recognition
     const enrichedMenuItems = enrichMenuItemsWithVariants(
       menuItems.map((item: MenuItem) => ({ id: item.id, name: item.name, category_id: item.category_id })),
       indianMenuDictionary
     );
-    const asrHints = buildASRHints(enrichedMenuItems);
-    console.log(`Built ${asrHints.length} ASR hints for restaurant: ${restaurant.name}`);
+    
+    // Combine enriched DB items with full dictionary for comprehensive ASR hints
+    const allMenuItemsForHints = enrichedMenuItems.length > 0 
+      ? enrichedMenuItems 
+      : indianMenuDictionary; // Use full dictionary if no DB items
+    
+    // Always include the static dictionary items in ASR hints for better recognition
+    const asrHints = buildASRHints([...enrichedMenuItems, ...indianMenuDictionary]);
+    console.log(`Built ${asrHints.length} ASR hints for restaurant: ${restaurant.name} (${enrichedMenuItems.length} from DB, ${indianMenuDictionary.length} from dictionary)`);
 
     // Build the webhook URL for order creation
     const orderWebhookUrl = `${supabaseUrl}/functions/v1/retell-create-order`;
