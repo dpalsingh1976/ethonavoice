@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Phone, ArrowLeft, Save, Workflow, Upload, BookOpen, CheckCircle } from 'lucide-react';
+import { Phone, ArrowLeft, Save, Workflow, Upload, BookOpen, CheckCircle, Code, Copy } from 'lucide-react';
 import { Restaurant } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 
@@ -27,6 +27,8 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [creatingFlow, setCreatingFlow] = useState(false);
   const [uploadingKb, setUploadingKb] = useState(false);
+  const [flowData, setFlowData] = useState<any>(null);
+  const [fetchingFlow, setFetchingFlow] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -229,6 +231,48 @@ const Settings = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleFetchConversationFlow = async () => {
+    if (!restaurant?.retell_conversation_flow_id) return;
+    
+    setFetchingFlow(true);
+    setFlowData(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('retell-get-flow', {
+        body: { conversationFlowId: restaurant.retell_conversation_flow_id }
+      });
+      
+      if (error) throw error;
+      if (data.success) {
+        setFlowData(data.flow);
+        toast({
+          title: 'Flow data retrieved',
+          description: 'Conversation flow configuration loaded successfully.',
+        });
+      } else {
+        throw new Error(data.error || 'Failed to fetch flow');
+      }
+    } catch (error: any) {
+      console.error('Error fetching conversation flow:', error);
+      toast({ 
+        title: 'Error fetching flow', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
+    } finally {
+      setFetchingFlow(false);
+    }
+  };
+
+  const handleCopyFlowData = () => {
+    if (flowData) {
+      navigator.clipboard.writeText(JSON.stringify(flowData, null, 2));
+      toast({
+        title: 'Copied!',
+        description: 'Flow data copied to clipboard.',
+      });
     }
   };
 
@@ -451,6 +495,47 @@ const Settings = () => {
                     </p>
                   </CardContent>
                 </Card>
+
+                {restaurant?.retell_conversation_flow_id && (
+                  <Card className="border-border/50">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Code className="h-5 w-5" />
+                        Conversation Flow Details
+                      </CardTitle>
+                      <CardDescription>
+                        Retrieve and inspect the full conversation flow configuration from Retell
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Button 
+                        onClick={handleFetchConversationFlow}
+                        disabled={fetchingFlow}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        <Code className="mr-2 h-4 w-4" />
+                        {fetchingFlow ? 'Fetching...' : 'Fetch Flow Data'}
+                      </Button>
+                      
+                      {flowData && (
+                        <div className="relative">
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            className="absolute top-2 right-2 z-10"
+                            onClick={handleCopyFlowData}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <pre className="bg-muted rounded-lg p-4 overflow-auto max-h-96 text-xs font-mono">
+                            <code>{JSON.stringify(flowData, null, 2)}</code>
+                          </pre>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
                 <Card className="border-border/50">
                   <CardHeader>
