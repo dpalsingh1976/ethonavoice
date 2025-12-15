@@ -105,6 +105,33 @@ const Kitchen = () => {
           </CardContent>
         </Card>
 
+        {/* Printer Setup */}
+        <Card className="border-border/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Printer className="h-5 w-5 text-muted-foreground" />
+              Printer Setup
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <p className="text-sm font-medium text-foreground mb-2">Check Default Printer (Windows):</p>
+              <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                <li>Press <kbd className="px-1.5 py-0.5 rounded bg-muted text-xs font-mono">Win + I</kbd> to open Settings</li>
+                <li>Go to <span className="font-medium text-foreground">Bluetooth & devices → Printers & scanners</span></li>
+                <li>Find your thermal printer and click it</li>
+                <li>Click <span className="font-medium text-foreground">"Set as default"</span></li>
+              </ol>
+            </div>
+            <div className="border-t border-border pt-4">
+              <p className="text-sm font-medium text-foreground mb-2">Verify Setup:</p>
+              <p className="text-sm text-muted-foreground">
+                Your default printer will be used automatically. Test by placing a test order or printing from any application.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Kiosk Warning */}
         <Card className="border-warning/50 bg-warning/5">
           <CardHeader className="pb-3">
