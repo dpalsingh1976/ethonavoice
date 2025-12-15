@@ -10,6 +10,8 @@ import { Printer, Wifi, WifiOff, AlertTriangle, Loader2 } from 'lucide-react';
 const Kitchen = () => {
   const { user } = useAuth();
   const printTicket = usePrintTicket();
+  const printTicketRef = useRef(printTicket);
+  printTicketRef.current = printTicket;
   const seenOrderIds = useRef<Set<string>>(new Set());
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +95,7 @@ const Kitchen = () => {
 
           // Mark as seen and print
           seenOrderIds.current.add(newOrder.id);
-          await printTicket(fullOrder);
+          await printTicketRef.current(fullOrder);
 
           // Update UI
           setPrintCount((prev) => prev + 1);
@@ -108,7 +110,7 @@ const Kitchen = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [restaurantId, printTicket]);
+  }, [restaurantId]);
 
   if (isLoading) {
     return (
