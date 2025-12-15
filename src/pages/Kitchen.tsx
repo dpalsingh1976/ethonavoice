@@ -1,24 +1,56 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePrintTicket } from '@/hooks/usePrintTicket';
+import { useAuth } from '@/lib/auth';
 import { Order, OrderItem } from '@/types/database';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Printer, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
+import { Printer, Wifi, WifiOff, AlertTriangle, Loader2 } from 'lucide-react';
 
 const Kitchen = () => {
+  const { user } = useAuth();
   const printTicket = usePrintTicket();
   const seenOrderIds = useRef<Set<string>>(new Set());
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [printedOrders, setPrintedOrders] = useState<(Order & { items: OrderItem[] })[]>([]);
   const [printCount, setPrintCount] = useState(0);
 
+  // First, fetch the user's restaurant
   useEffect(() => {
+    const fetchRestaurant = async () => {
+      if (!user) return;
+      
+      const { data: restaurant } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('owner_id', user.id)
+        .single();
+      
+      if (restaurant) {
+        setRestaurantId(restaurant.id);
+      }
+      setIsLoading(false);
+    };
+    
+    fetchRestaurant();
+  }, [user]);
+
+  // Subscribe to realtime orders once we have restaurant ID
+  useEffect(() => {
+    if (!restaurantId) return;
+
     const channel = supabase
       .channel('kitchen-orders')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders' },
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `restaurant_id=eq.${restaurantId}`
+        },
         async (payload) => {
           const newOrder = payload.new as Order;
 
@@ -55,7 +87,15 @@ const Kitchen = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [printTicket]);
+  }, [restaurantId, printTicket]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background p-6">
