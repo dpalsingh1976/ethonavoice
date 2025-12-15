@@ -14,22 +14,39 @@ const Kitchen = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [printedOrders, setPrintedOrders] = useState<(Order & { items: OrderItem[] })[]>([]);
   const [printCount, setPrintCount] = useState(0);
 
   // First, fetch the user's restaurant
   useEffect(() => {
     const fetchRestaurant = async () => {
-      if (!user) return;
+      if (!user) {
+        setError('Not authenticated');
+        setIsLoading(false);
+        return;
+      }
       
-      const { data: restaurant } = await supabase
+      console.log('Fetching restaurant for user:', user.id);
+      
+      const { data: restaurant, error: fetchError } = await supabase
         .from('restaurants')
         .select('id')
         .eq('owner_id', user.id)
         .single();
       
+      if (fetchError) {
+        console.error('Error fetching restaurant:', fetchError);
+        setError('Could not find restaurant for this user');
+        setIsLoading(false);
+        return;
+      }
+      
       if (restaurant) {
+        console.log('Found restaurant:', restaurant.id);
         setRestaurantId(restaurant.id);
+      } else {
+        setError('No restaurant found');
       }
       setIsLoading(false);
     };
@@ -40,6 +57,8 @@ const Kitchen = () => {
   // Subscribe to realtime orders once we have restaurant ID
   useEffect(() => {
     if (!restaurantId) return;
+
+    console.log('Setting up realtime subscription for restaurant:', restaurantId);
 
     const channel = supabase
       .channel('kitchen-orders')
@@ -52,6 +71,7 @@ const Kitchen = () => {
           filter: `restaurant_id=eq.${restaurantId}`
         },
         async (payload) => {
+          console.log('Received new order:', payload);
           const newOrder = payload.new as Order;
 
           // Skip if already processed in this session
@@ -81,6 +101,7 @@ const Kitchen = () => {
         }
       )
       .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
         setIsConnected(status === 'SUBSCRIBED');
       });
 
@@ -93,6 +114,27 @@ const Kitchen = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background flex items-center justify-center">
+        <Card className="border-destructive/50 bg-destructive/5 max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Connection Error
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Please ensure you're logged in and have a restaurant configured.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
