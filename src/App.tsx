@@ -60,7 +60,14 @@ const App = () => (
               }
             />
             <Route path="/dev/voice-test" element={<VoiceTest />} />
-            <Route path="/kitchen" element={<Kitchen />} />
+            <Route
+              path="/kitchen"
+              element={
+                <ProtectedRoute>
+                  <Kitchen />
+                </ProtectedRoute>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
