@@ -9,12 +9,13 @@ import { Phone, ArrowLeft, Calendar, User, MapPin, Package, Printer } from 'luci
 import { Order, OrderItem } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { printKitchenTicket } from '@/components/KitchenTicket';
+import { usePrintTicket } from '@/hooks/usePrintTicket';
 
 const Orders = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const printTicket = usePrintTicket();
   const [orders, setOrders] = useState<(Order & { items: OrderItem[] })[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
@@ -94,16 +95,7 @@ const Orders = () => {
 
   const handlePrintTicket = async (order: Order & { items: OrderItem[] }) => {
     try {
-      // Print the ticket
-      printKitchenTicket(order, 'HONEST RESTAURANT', '60 Main Ave, Clifton, NJ');
-      
-      // Update ticket_printed_at in database
-      const { error } = await supabase
-        .from('orders')
-        .update({ ticket_printed_at: new Date().toISOString() })
-        .eq('id', order.id);
-
-      if (error) throw error;
+      await printTicket(order);
 
       // Update local state
       setOrders(prev => prev.map(o => 

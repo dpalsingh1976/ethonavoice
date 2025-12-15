@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import Onboarding from "./pages/Onboarding";
 import NotFound from "./pages/NotFound";
 import VoiceTest from "./pages/VoiceTest";
+import Kitchen from "./pages/Kitchen";
 
 const queryClient = new QueryClient();
 
@@ -59,6 +60,7 @@ const App = () => (
               }
             />
             <Route path="/dev/voice-test" element={<VoiceTest />} />
+            <Route path="/kitchen" element={<Kitchen />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
