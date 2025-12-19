@@ -66,10 +66,10 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    // Fetch the restaurant to get the agent ID
+    // Fetch the restaurant to get the agent IDs array
     const { data: restaurant, error: fetchError } = await supabase
       .from("restaurants")
-      .select("retell_agent_id, name")
+      .select("retell_agent_ids, name")
       .eq("id", restaurantId)
       .single();
 
@@ -81,9 +81,10 @@ serve(async (req) => {
       );
     }
 
-    if (!restaurant.retell_agent_id) {
+    const agentIds = restaurant.retell_agent_ids as string[] | null;
+    if (!agentIds || !Array.isArray(agentIds) || agentIds.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: "No Retell agent configured for this restaurant. Please create a voice flow first." }),
+        JSON.stringify({ success: false, error: "No Retell agents configured for this restaurant. Please create a voice flow first." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -98,38 +99,56 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Updating agent ${restaurant.retell_agent_id} with ${pronunciations.length} pronunciations`);
+    console.log(`Updating ${agentIds.length} agents with ${pronunciations.length} pronunciations`);
 
-    // Update the Retell agent with pronunciation dictionary
-    const updateResponse = await fetch(`https://api.retellai.com/update-agent/${restaurant.retell_agent_id}`, {
-      method: "PATCH",
-      headers: {
-        "Authorization": `Bearer ${RETELL_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        pronunciation_dictionary: pronunciations
-      }),
-    });
+    // Update all Retell agents with pronunciation dictionary
+    const updatedAgentIds: string[] = [];
+    const errors: string[] = [];
 
-    if (!updateResponse.ok) {
-      const errorText = await updateResponse.text();
-      console.error("Retell API error:", updateResponse.status, errorText);
-      return new Response(
-        JSON.stringify({ success: false, error: `Retell API error: ${errorText}` }),
-        { status: updateResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    for (const agentId of agentIds) {
+      try {
+        const updateResponse = await fetch(`https://api.retellai.com/update-agent/${agentId}`, {
+          method: "PATCH",
+          headers: {
+            "Authorization": `Bearer ${RETELL_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            pronunciation_dictionary: pronunciations
+          }),
+        });
+
+        if (!updateResponse.ok) {
+          const errorText = await updateResponse.text();
+          console.error(`Retell API error for agent ${agentId}:`, updateResponse.status, errorText);
+          errors.push(`Agent ${agentId}: ${errorText}`);
+        } else {
+          const updatedAgent = await updateResponse.json();
+          console.log("Agent updated successfully:", updatedAgent.agent_id);
+          updatedAgentIds.push(agentId);
+        }
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Unknown error";
+        console.error(`Error updating agent ${agentId}:`, errorMsg);
+        errors.push(`Agent ${agentId}: ${errorMsg}`);
+      }
     }
 
-    const updatedAgent = await updateResponse.json();
-    console.log("Agent updated successfully:", updatedAgent.agent_id);
+    if (updatedAgentIds.length === 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: `Failed to update any agents: ${errors.join("; ")}` }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Successfully uploaded ${pronunciations.length} pronunciation entries`,
+        message: `Successfully uploaded ${pronunciations.length} pronunciation entries to ${updatedAgentIds.length} agent(s)`,
         count: pronunciations.length,
-        agentId: updatedAgent.agent_id
+        agentsUpdated: updatedAgentIds.length,
+        agentIds: updatedAgentIds,
+        errors: errors.length > 0 ? errors : undefined
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
