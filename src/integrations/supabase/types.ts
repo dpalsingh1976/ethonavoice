@@ -320,8 +320,6 @@ export type Database = {
         Row: {
           address: string
           created_at: string
-          elevenlabs_agent_id: string | null
-          elevenlabs_agent_ids: Json | null
           id: string
           is_active: boolean
           name: string
@@ -336,13 +334,10 @@ export type Database = {
           timezone: string
           updated_at: string
           vapi_assistant_id: string | null
-          webhook_url: string | null
         }
         Insert: {
           address: string
           created_at?: string
-          elevenlabs_agent_id?: string | null
-          elevenlabs_agent_ids?: Json | null
           id?: string
           is_active?: boolean
           name: string
@@ -357,13 +352,10 @@ export type Database = {
           timezone?: string
           updated_at?: string
           vapi_assistant_id?: string | null
-          webhook_url?: string | null
         }
         Update: {
           address?: string
           created_at?: string
-          elevenlabs_agent_id?: string | null
-          elevenlabs_agent_ids?: Json | null
           id?: string
           is_active?: boolean
           name?: string
@@ -378,7 +370,6 @@ export type Database = {
           timezone?: string
           updated_at?: string
           vapi_assistant_id?: string | null
-          webhook_url?: string | null
         }
         Relationships: []
       }
