@@ -336,6 +336,7 @@ export type Database = {
           timezone: string
           updated_at: string
           vapi_assistant_id: string | null
+          webhook_url: string | null
         }
         Insert: {
           address: string
@@ -356,6 +357,7 @@ export type Database = {
           timezone?: string
           updated_at?: string
           vapi_assistant_id?: string | null
+          webhook_url?: string | null
         }
         Update: {
           address?: string
@@ -376,6 +378,7 @@ export type Database = {
           timezone?: string
           updated_at?: string
           vapi_assistant_id?: string | null
+          webhook_url?: string | null
         }
         Relationships: []
       }
