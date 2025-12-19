@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Phone, ArrowLeft, Save, Workflow, Upload, BookOpen, CheckCircle, Code, Copy } from 'lucide-react';
+import { Phone, ArrowLeft, Save, Workflow, Upload, BookOpen, CheckCircle, Code, Copy, Volume2 } from 'lucide-react';
 import { Restaurant } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 
@@ -29,7 +29,10 @@ const Settings = () => {
   const [uploadingKb, setUploadingKb] = useState(false);
   const [flowData, setFlowData] = useState<any>(null);
   const [fetchingFlow, setFetchingFlow] = useState(false);
+  const [uploadingPronunciation, setUploadingPronunciation] = useState(false);
+  const [pronunciationCount, setPronunciationCount] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pronunciationInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -273,6 +276,47 @@ const Settings = () => {
         title: 'Copied!',
         description: 'Flow data copied to clipboard.',
       });
+    }
+  };
+
+  const handlePronunciationUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !restaurant) return;
+
+    setUploadingPronunciation(true);
+    try {
+      const content = await file.text();
+      
+      const { data, error } = await supabase.functions.invoke('retell-pronunciation', {
+        body: { 
+          restaurantId: restaurant.id,
+          plsContent: content
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setPronunciationCount(data.count);
+        toast({
+          title: 'Pronunciation Dictionary Uploaded!',
+          description: `Successfully added ${data.count} pronunciation rules to your voice agent.`,
+        });
+      } else {
+        throw new Error(data.error || 'Failed to upload pronunciation dictionary');
+      }
+    } catch (error: any) {
+      console.error('Error uploading pronunciation dictionary:', error);
+      toast({
+        title: 'Error uploading pronunciation dictionary',
+        description: error.message || 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingPronunciation(false);
+      if (pronunciationInputRef.current) {
+        pronunciationInputRef.current.value = '';
+      }
     }
   };
 
@@ -533,6 +577,65 @@ const Settings = () => {
                           </pre>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {restaurant?.retell_agent_id && (
+                  <Card className="border-border/50">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Volume2 className="h-5 w-5" />
+                        Pronunciation Dictionary
+                      </CardTitle>
+                      <CardDescription>
+                        Upload a PLS file to help your voice agent pronounce menu items correctly
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {pronunciationCount !== null && (
+                        <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-green-600">
+                          <CheckCircle className="h-5 w-5" />
+                          <div>
+                            <p className="text-sm font-medium">Pronunciation Dictionary Active</p>
+                            <p className="text-xs opacity-80">
+                              {pronunciationCount} pronunciation rules loaded
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="space-y-2">
+                        <Label>Upload PLS File</Label>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Upload a PLS (Pronunciation Lexicon Specification) file with IPA phonemes for menu items.
+                        </p>
+                        <input
+                          ref={pronunciationInputRef}
+                          type="file"
+                          accept=".pls,.xml"
+                          onChange={handlePronunciationUpload}
+                          className="hidden"
+                          id="pronunciation-file-input"
+                        />
+                        <Button 
+                          variant="outline" 
+                          onClick={() => pronunciationInputRef.current?.click()}
+                          disabled={uploadingPronunciation}
+                          className="w-full"
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          {uploadingPronunciation 
+                            ? 'Uploading...' 
+                            : pronunciationCount !== null
+                              ? 'Update Pronunciation Dictionary' 
+                              : 'Upload Pronunciation Dictionary'}
+                        </Button>
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground">
+                        The pronunciation dictionary ensures correct pronunciation of Indian dish names, spices, and other menu-specific terms.
+                      </p>
                     </CardContent>
                   </Card>
                 )}
