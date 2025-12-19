@@ -1,34 +1,20 @@
 project_id = "rsvrhwslkonyrqfvqzzv"
 
-[functions.vapi-assistant]
-verify_jwt = true
-
-[functions.vapi-webhook]
-verify_jwt = false
-
-[functions.retell-agent]
-verify_jwt = true
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
 [functions.retell-webhook]
 verify_jwt = false
 
-[functions.retell-create-order]
-verify_jwt = false
-
-[functions.retell-conversation-flow]
-verify_jwt = true
-
-[functions.retell-knowledge-base]
-verify_jwt = true
-
-[functions.retell-get-flow]
-verify_jwt = false
-
-[functions.retell-pronunciation]
-verify_jwt = true
-
-[functions.elevenlabs-create-order]
+[functions.vapi-webhook]
 verify_jwt = false
 
 [functions.webhook-tool]
+verify_jwt = false
+
+[functions.elevenlabs-configure-tool]
 verify_jwt = false

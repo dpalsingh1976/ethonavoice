@@ -8,13 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Phone, ArrowLeft, Save, Workflow, Upload, BookOpen, CheckCircle, Code, Copy, Volume2 } from 'lucide-react';
+import { Phone, ArrowLeft, Save, Workflow, Upload, BookOpen, CheckCircle, Code, Copy, Volume2, Webhook, Settings2 } from 'lucide-react';
 import { Restaurant } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 
 interface ExtendedRestaurant extends Restaurant {
   retell_conversation_flow_id?: string;
   retell_knowledge_base_id?: string;
+  elevenlabs_agent_id?: string;
 }
 
 const Settings = () => {
@@ -31,6 +32,8 @@ const Settings = () => {
   const [fetchingFlow, setFetchingFlow] = useState(false);
   const [uploadingPronunciation, setUploadingPronunciation] = useState(false);
   const [pronunciationCount, setPronunciationCount] = useState<number | null>(null);
+  const [configuringTool, setConfiguringTool] = useState(false);
+  const [elevenlabsAgentId, setElevenlabsAgentId] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pronunciationInputRef = useRef<HTMLInputElement>(null);
 
@@ -50,6 +53,7 @@ const Settings = () => {
 
       if (error) throw error;
       setRestaurant(data as ExtendedRestaurant);
+      setElevenlabsAgentId(data.elevenlabs_agent_id || '');
 
       // Fetch voice settings
       const { data: voiceData, error: voiceError } = await supabase
@@ -317,6 +321,53 @@ const Settings = () => {
       if (pronunciationInputRef.current) {
         pronunciationInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleConfigureElevenlabsWebhookTool = async () => {
+    if (!restaurant || !elevenlabsAgentId.trim()) {
+      toast({
+        title: 'Agent ID Required',
+        description: 'Please enter your ElevenLabs Agent ID',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setConfiguringTool(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-configure-tool', {
+        body: { 
+          restaurantId: restaurant.id,
+          agentId: elevenlabsAgentId.trim()
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        // Update local state
+        setRestaurant(prev => prev ? { 
+          ...prev, 
+          elevenlabs_agent_id: elevenlabsAgentId.trim()
+        } : null);
+        
+        toast({
+          title: 'Webhook Tool Configured!',
+          description: `Successfully added webhook_tool to your ElevenLabs agent. ${data.toolsCount} tools now configured.`,
+        });
+      } else {
+        throw new Error(data.error || 'Failed to configure webhook tool');
+      }
+    } catch (error: any) {
+      console.error('Error configuring webhook tool:', error);
+      toast({
+        title: 'Error configuring webhook tool',
+        description: error.message || 'Please check your Agent ID and try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setConfiguringTool(false);
     }
   };
 
@@ -798,20 +849,104 @@ const Settings = () => {
             </TabsContent>
 
             <TabsContent value="integration">
-              <Card className="border-border/50">
-                <CardHeader>
-                  <CardTitle>POS Integration</CardTitle>
-                  <CardDescription>
-                    Connect Toast or Clover POS (Coming Soon)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    POS integration will be available in the next update.
-                    You'll be able to sync your menu, pricing, and inventory from Toast or Clover.
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="space-y-6">
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Webhook className="h-5 w-5" />
+                      ElevenLabs Webhook Tool
+                    </CardTitle>
+                    <CardDescription>
+                      Configure the webhook tool on your ElevenLabs agent automatically - no manual UI entry needed
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {restaurant?.elevenlabs_agent_id && (
+                      <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-green-600">
+                        <CheckCircle className="h-5 w-5" />
+                        <div>
+                          <p className="text-sm font-medium">Webhook Tool Configured</p>
+                          <p className="text-xs opacity-80 font-mono">
+                            Agent: {restaurant.elevenlabs_agent_id}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="elevenlabs_agent_id">ElevenLabs Agent ID</Label>
+                      <Input
+                        id="elevenlabs_agent_id"
+                        value={elevenlabsAgentId}
+                        onChange={(e) => setElevenlabsAgentId(e.target.value)}
+                        placeholder="Enter your ElevenLabs Agent ID"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Find this in your ElevenLabs dashboard under Conversational AI → Your Agent
+                      </p>
+                    </div>
+
+                    <Button 
+                      onClick={handleConfigureElevenlabsWebhookTool} 
+                      disabled={configuringTool || !elevenlabsAgentId.trim()}
+                      className="w-full"
+                    >
+                      <Settings2 className="mr-2 h-4 w-4" />
+                      {configuringTool 
+                        ? 'Configuring...' 
+                        : restaurant?.elevenlabs_agent_id 
+                          ? 'Update Webhook Tool' 
+                          : 'Configure Webhook Tool'}
+                    </Button>
+
+                    <div className="rounded-lg bg-muted p-4 space-y-2">
+                      <p className="text-sm font-medium">What this does:</p>
+                      <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                        <li>Adds a <code className="bg-background px-1 rounded">webhook_tool</code> to your ElevenLabs agent</li>
+                        <li>Configures the tool to send order confirmations, leads, and inquiries to your backend</li>
+                        <li>Sets up the correct URL and parameters automatically</li>
+                        <li>No need to manually enter properties in ElevenLabs UI</li>
+                      </ul>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Webhook URL (Auto-configured)</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-tool`}
+                          readOnly
+                          className="font-mono text-xs"
+                        />
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/webhook-tool`);
+                            toast({ title: 'Copied!', description: 'Webhook URL copied to clipboard.' });
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-border/50">
+                  <CardHeader>
+                    <CardTitle>POS Integration</CardTitle>
+                    <CardDescription>
+                      Connect Toast or Clover POS (Coming Soon)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground">
+                      POS integration will be available in the next update.
+                      You'll be able to sync your menu, pricing, and inventory from Toast or Clover.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
