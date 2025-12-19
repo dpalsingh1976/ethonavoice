@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.retell-pronunciation]
 verify_jwt = true
+
+[functions.elevenlabs-create-order]
+verify_jwt = false
