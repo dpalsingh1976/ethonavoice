@@ -101,7 +101,7 @@ serve(async (req) => {
     console.log(`Updating agent ${restaurant.retell_agent_id} with ${pronunciations.length} pronunciations`);
 
     // Update the Retell agent with pronunciation dictionary
-    const updateResponse = await fetch(`https://api.retellai.com/v2/agent/${restaurant.retell_agent_id}`, {
+    const updateResponse = await fetch(`https://api.retellai.com/update-agent/${restaurant.retell_agent_id}`, {
       method: "PATCH",
       headers: {
         "Authorization": `Bearer ${RETELL_API_KEY}`,
